@@ -135,6 +135,45 @@
     min-height: 1.2em;
   }
 
+  .photo-label {
+    display: block;
+    margin: 14px 0 8px;
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    font-weight: 600;
+  }
+
+  input[type="file"] {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    max-width: 100%;
+  }
+
+  .photo-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .photo-row:empty {
+    display: none;
+    margin-top: 0;
+  }
+
+  .photo-row img {
+    flex: 1 1 0;
+    min-width: 0;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--accent-soft);
+  }
+
+  .photo-preview img {
+    max-width: 88px;
+  }
+
   .result-card {
     margin-bottom: 28px;
     display: none;
@@ -382,12 +421,16 @@
               >
               <button type="submit" id="submit-entry-btn">기록하기</button>
             </div>
+            <label for="diary-photos" class="photo-label">사진 첨부 (최대 5장, 선택)</label>
+            <input type="file" id="diary-photos" name="diary-photos" accept="image/*" multiple>
+            <div class="photo-row photo-preview" id="photo-preview"></div>
             <p class="form-hint" id="form-hint" role="status" aria-live="polite"></p>
           </form>
         </section>
 
         <section class="card result-card" id="result-card" aria-live="polite" aria-atomic="true">
           <h2>방금 남긴 마음</h2>
+          <div class="photo-row" id="result-photos"></div>
           <span class="emotion-badge" id="result-badge">
             <span class="emoji" id="result-emoji"></span>
             <span id="result-emotion-name"></span>
@@ -891,10 +934,67 @@
       var resultEmoji = document.getElementById('result-emoji');
       var resultEmotionName = document.getElementById('result-emotion-name');
       var resultMessage = document.getElementById('result-message');
+      var resultPhotos = document.getElementById('result-photos');
       var diaryList = document.getElementById('diary-list');
       var emptyState = document.getElementById('empty-state');
+      var photoInput = document.getElementById('diary-photos');
+      var photoPreview = document.getElementById('photo-preview');
 
       resultCard.classList.remove('visible', 'crisis');
+
+      var MAX_PHOTOS = 5;
+      var previewObjectUrls = [];
+
+      function clearPhotoPreview() {
+        previewObjectUrls.forEach(function (u) { URL.revokeObjectURL(u); });
+        previewObjectUrls = [];
+        photoPreview.innerHTML = '';
+      }
+
+      photoInput.addEventListener('change', function () {
+        clearPhotoPreview();
+        var files = Array.prototype.slice.call(photoInput.files);
+        if (files.length > MAX_PHOTOS) {
+          hint.textContent = '사진은 최대 ' + MAX_PHOTOS + '장까지 첨부할 수 있어요. 앞의 ' + MAX_PHOTOS + '장만 사용돼요.';
+        } else {
+          hint.textContent = '';
+        }
+        files.slice(0, MAX_PHOTOS).forEach(function (file) {
+          var url = URL.createObjectURL(file);
+          previewObjectUrls.push(url);
+          var img = document.createElement('img');
+          img.src = url;
+          img.alt = '첨부할 사진 미리보기';
+          photoPreview.appendChild(img);
+        });
+      });
+
+      function uploadPhotos(files, userId) {
+        var uploads = files.map(function (file, idx) {
+          var extMatch = /\.([a-zA-Z0-9]+)$/.exec(file.name || '');
+          var ext = (extMatch ? extMatch[1] : 'jpg').toLowerCase();
+          var path = userId + '/' + Date.now() + '-' + idx + '-' + Math.random().toString(36).slice(2) + '.' + ext;
+          return sb.storage.from('diary-photos').upload(path, file).then(function (res) {
+            if (res.error) throw res.error;
+            return sb.storage.from('diary-photos').getPublicUrl(path).data.publicUrl;
+          });
+        });
+        return Promise.all(uploads);
+      }
+
+      function buildPhotoRow(photoUrls) {
+        var row = document.createElement('div');
+        row.className = 'photo-row';
+        if (!photoUrls || !photoUrls.length) return row;
+        photoUrls.forEach(function (url) {
+          var img = document.createElement('img');
+          img.src = url;
+          img.alt = '첨부된 사진';
+          img.loading = 'lazy';
+          row.appendChild(img);
+        });
+        return row;
+      }
 
       var EMOTION_STYLE_KEY = {
         '기쁨': 'joy',
@@ -1010,6 +1110,7 @@
           response.textContent = entry.message;
 
           li.appendChild(meta);
+          li.appendChild(buildPhotoRow(entry.photo_urls));
           li.appendChild(text);
           li.appendChild(response);
           diaryList.appendChild(li);
@@ -1022,6 +1123,13 @@
         resultEmoji.textContent = entry.emoji;
         resultEmotionName.textContent = entry.emotion;
         resultMessage.textContent = entry.message;
+        resultPhotos.innerHTML = '';
+        (entry.photo_urls || []).forEach(function (url) {
+          var img = document.createElement('img');
+          img.src = url;
+          img.alt = '첨부된 사진';
+          resultPhotos.appendChild(img);
+        });
         resultCard.classList.add('visible');
         resultCard.classList.toggle('crisis', styleKey === 'crisis');
       }
@@ -1049,16 +1157,25 @@
         var submitBtn = document.getElementById('submit-entry-btn');
         submitBtn.disabled = true;
 
-        sb.from(TABLE)
-          .insert([{
-            user_id: currentUser.id,
-            text: text,
-            emotion: emotionResult.emotion,
-            intensity: emotionResult.intensity,
-            emoji: emotionResult.emoji,
-            message: message
-          }])
-          .select()
+        var photoFiles = Array.prototype.slice.call(photoInput.files).slice(0, MAX_PHOTOS);
+        if (photoFiles.length) {
+          hint.textContent = '사진을 업로드하는 중이에요...';
+        }
+
+        (photoFiles.length ? uploadPhotos(photoFiles, currentUser.id) : Promise.resolve([]))
+          .then(function (photoUrls) {
+            return sb.from(TABLE)
+              .insert([{
+                user_id: currentUser.id,
+                text: text,
+                emotion: emotionResult.emotion,
+                intensity: emotionResult.intensity,
+                emoji: emotionResult.emoji,
+                message: message,
+                photo_urls: photoUrls.length ? photoUrls : null
+              }])
+              .select();
+          })
           .then(function (res) {
             submitBtn.disabled = false;
             if (res.error) {
@@ -1069,12 +1186,15 @@
             entries.unshift(entry);
             renderList();
             showResult(entry);
+            hint.textContent = '';
             input.value = '';
+            photoInput.value = '';
+            clearPhotoPreview();
             input.focus();
           })
           .catch(function (err) {
             submitBtn.disabled = false;
-            hint.textContent = '기록 중 오류가 발생했어요: ' + err.message;
+            hint.textContent = '사진 업로드 또는 기록 중 오류가 발생했어요: ' + err.message;
           });
       });
 
