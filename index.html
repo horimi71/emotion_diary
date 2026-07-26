@@ -252,6 +252,64 @@
     font-size: 0.92rem;
   }
 
+  .section-title {
+    margin: 0 0 6px;
+    font-size: 1.05rem;
+  }
+
+  .auth-desc {
+    margin: 0 0 16px;
+    color: var(--ink-soft);
+    font-size: 0.88rem;
+    line-height: 1.6;
+  }
+
+  .auth-card {
+    margin-bottom: 24px;
+  }
+
+  .app-content {
+    display: none;
+  }
+
+  .app-content.visible {
+    display: block;
+  }
+
+  .user-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding: 0 4px;
+  }
+
+  .user-bar span {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .user-bar button {
+    flex: 0 0 auto;
+    padding: 8px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--paper);
+    color: var(--ink-soft);
+    font-size: 0.82rem;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .user-bar button:hover {
+    background: var(--accent-soft);
+    color: var(--ink);
+  }
+
   @media (max-width: 420px) {
     body {
       padding: 20px 10px 48px;
@@ -283,40 +341,63 @@
     </header>
 
     <main>
-      <section class="card entry-form" aria-labelledby="entry-form-title">
-        <h2 id="entry-form-title" class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">오늘의 기록 작성</h2>
-        <form id="diary-form" novalidate>
-          <label for="diary-input">오늘 있었던 일을 한 줄로 적어보세요</label>
+      <section class="card auth-card" id="auth-card" aria-labelledby="auth-title">
+        <h2 id="auth-title" class="section-title">이메일로 로그인</h2>
+        <p class="auth-desc">비밀번호 없이, 이메일로 받은 링크를 클릭하면 로그인돼요. 로그인한 회원들은 서로의 기록을 함께 볼 수 있어요.</p>
+
+        <form id="email-form" novalidate>
+          <label for="auth-email">이메일 주소</label>
           <div class="input-row">
-            <input
-              type="text"
-              id="diary-input"
-              name="diary-input"
-              placeholder="예: 오늘 오랜만에 친구를 만나서 즐거웠다"
-              autocomplete="off"
-              maxlength="500"
-              required
-            >
-            <button type="submit">기록하기</button>
+            <input type="email" id="auth-email" name="auth-email" placeholder="you@example.com" autocomplete="email" required>
+            <button type="submit" id="send-code-btn">로그인 링크 받기</button>
           </div>
-          <p class="form-hint" id="form-hint" role="status" aria-live="polite"></p>
         </form>
+
+        <p class="form-hint" id="auth-hint" role="status" aria-live="polite"></p>
       </section>
 
-      <section class="card result-card" id="result-card" aria-live="polite" aria-atomic="true">
-        <h2>방금 남긴 마음</h2>
-        <span class="emotion-badge" id="result-badge">
-          <span class="emoji" id="result-emoji"></span>
-          <span id="result-emotion-name"></span>
-        </span>
-        <p class="empathy-message" id="result-message"></p>
-      </section>
+      <div id="app-content" class="app-content">
+        <div class="user-bar">
+          <span id="user-email-label"></span>
+          <button type="button" id="sign-out-btn">로그아웃</button>
+        </div>
 
-      <section class="diary-log" aria-labelledby="diary-log-title">
-        <h2 id="diary-log-title">지금까지의 기록</h2>
-        <ul class="diary-list" id="diary-list"></ul>
-        <p class="empty-state" id="empty-state">아직 기록된 하루가 없어요. 오늘의 한 줄을 남겨보세요.</p>
-      </section>
+        <section class="card entry-form" aria-labelledby="entry-form-title">
+          <h2 id="entry-form-title" class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">오늘의 기록 작성</h2>
+          <form id="diary-form" novalidate>
+            <label for="diary-input">오늘 있었던 일을 한 줄로 적어보세요</label>
+            <div class="input-row">
+              <input
+                type="text"
+                id="diary-input"
+                name="diary-input"
+                placeholder="예: 오늘 오랜만에 친구를 만나서 즐거웠다"
+                autocomplete="off"
+                maxlength="500"
+                required
+              >
+              <button type="submit" id="submit-entry-btn">기록하기</button>
+            </div>
+            <p class="form-hint" id="form-hint" role="status" aria-live="polite"></p>
+          </form>
+        </section>
+
+        <section class="card result-card" id="result-card" aria-live="polite" aria-atomic="true">
+          <h2>방금 남긴 마음</h2>
+          <span class="emotion-badge" id="result-badge">
+            <span class="emoji" id="result-emoji"></span>
+            <span id="result-emotion-name"></span>
+          </span>
+          <p class="empathy-message" id="result-message"></p>
+        </section>
+
+        <section class="diary-log" aria-labelledby="diary-log-title">
+          <h2 id="diary-log-title">회원들이 함께 남긴 기록</h2>
+          <p class="form-hint" id="list-hint" role="status" aria-live="polite"></p>
+          <ul class="diary-list" id="diary-list"></ul>
+          <p class="empty-state" id="empty-state">아직 기록된 하루가 없어요. 오늘의 한 줄을 남겨보세요.</p>
+        </section>
+      </div>
     </main>
   </div>
 
@@ -698,9 +779,85 @@
   global.generateEmpathyResponse = generateEmpathyResponse;
 })(window);
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     (function () {
-      var STORAGE_KEY = 'ai-empathy-diary-entries';
+      var SUPABASE_URL = 'https://vlfcssavypbwrtrjhxln.supabase.co';
+      var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZsZmNzc2F2eXBid3J0cmpoeGxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwNTI3NjUsImV4cCI6MjEwMDYyODc2NX0.k5RckRGNuAmUeVCz071FNGoeO3VzsPl_HFRcRMXveH0';
+      var SITE_URL = 'https://horimi71.github.io/emotion_diary/';
+      var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      var TABLE = 'diary_entries';
+
+      var emailForm = document.getElementById('email-form');
+      var authEmail = document.getElementById('auth-email');
+      var authHint = document.getElementById('auth-hint');
+      var authCard = document.getElementById('auth-card');
+      var appContent = document.getElementById('app-content');
+      var userEmailLabel = document.getElementById('user-email-label');
+      var signOutBtn = document.getElementById('sign-out-btn');
+      var listHint = document.getElementById('list-hint');
+
+      var currentUser = null;
+
+      function setAuthHint(msg) {
+        authHint.textContent = msg || '';
+      }
+
+      emailForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var email = authEmail.value.trim();
+        if (!email) {
+          setAuthHint('이메일 주소를 입력해 주세요.');
+          return;
+        }
+        var btn = document.getElementById('send-code-btn');
+        btn.disabled = true;
+        setAuthHint('로그인 링크를 보내는 중이에요...');
+
+        sb.auth.signInWithOtp({
+          email: email,
+          options: { shouldCreateUser: true, emailRedirectTo: SITE_URL }
+        })
+          .then(function (res) {
+            btn.disabled = false;
+            if (res.error) {
+              setAuthHint('로그인 링크 발송에 실패했어요: ' + res.error.message);
+              return;
+            }
+            setAuthHint(email + ' 주소로 로그인 링크를 보냈어요. 메일함에서 링크를 클릭해 주세요.');
+          })
+          .catch(function (err) {
+            btn.disabled = false;
+            setAuthHint('로그인 링크 발송 중 오류가 발생했어요: ' + err.message);
+          });
+      });
+
+      signOutBtn.addEventListener('click', function () {
+        sb.auth.signOut();
+      });
+
+      function showLoggedOut() {
+        authCard.style.display = 'block';
+        appContent.classList.remove('visible');
+      }
+
+      function showLoggedIn(user) {
+        currentUser = user;
+        authCard.style.display = 'none';
+        appContent.classList.add('visible');
+        userEmailLabel.textContent = user.email;
+        loadEntries();
+        subscribeRealtime();
+      }
+
+      sb.auth.onAuthStateChange(function (event, session) {
+        if (session && session.user) {
+          showLoggedIn(session.user);
+        } else {
+          currentUser = null;
+          showLoggedOut();
+        }
+      });
 
       var form = document.getElementById('diary-form');
       var input = document.getElementById('diary-input');
@@ -728,25 +885,44 @@
         '위기': 'crisis'
       };
 
+      var entries = [];
+      var realtimeChannel = null;
+
       function loadEntries() {
-        try {
-          var raw = localStorage.getItem(STORAGE_KEY);
-          var parsed = raw ? JSON.parse(raw) : [];
-          return Array.isArray(parsed) ? parsed : [];
-        } catch (e) {
-          return [];
-        }
+        listHint.textContent = '기록을 불러오는 중이에요...';
+        sb.from(TABLE)
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(200)
+          .then(function (res) {
+            if (res.error) {
+              listHint.textContent = '기록을 불러오지 못했어요: ' + res.error.message;
+              return;
+            }
+            listHint.textContent = '';
+            entries = res.data || [];
+            renderList();
+          })
+          .catch(function (err) {
+            listHint.textContent = '기록을 불러오는 중 오류가 발생했어요: ' + err.message;
+          });
       }
 
-      function saveEntries(entries) {
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-        } catch (e) {
-          /* localStorage unavailable, silently ignore */
+      function subscribeRealtime() {
+        if (realtimeChannel) {
+          sb.removeChannel(realtimeChannel);
         }
+        realtimeChannel = sb
+          .channel('diary_entries_changes')
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: TABLE }, function (payload) {
+            var incoming = payload.new;
+            var alreadyExists = entries.some(function (e) { return e.id === incoming.id; });
+            if (alreadyExists) return;
+            entries.unshift(incoming);
+            renderList();
+          })
+          .subscribe();
       }
-
-      var entries = loadEntries();
 
       function formatTimestamp(iso) {
         var d = new Date(iso);
@@ -796,7 +972,7 @@
           meta.className = 'meta';
 
           var time = document.createElement('time');
-          time.textContent = formatTimestamp(entry.createdAt);
+          time.textContent = formatTimestamp(entry.created_at);
 
           meta.appendChild(time);
           meta.appendChild(buildBadge(entry.emotion, entry.emoji));
@@ -836,31 +1012,49 @@
           return;
         }
 
+        if (!currentUser) {
+          hint.textContent = '로그인 후 기록할 수 있어요.';
+          return;
+        }
+
         hint.textContent = '';
 
         var emotionResult = analyzeEmotion(text);
         var message = generateEmpathyResponse(emotionResult, text);
 
-        var entry = {
-          id: Date.now(),
-          text: text,
-          createdAt: new Date().toISOString(),
-          emotion: emotionResult.emotion,
-          intensity: emotionResult.intensity,
-          emoji: emotionResult.emoji,
-          message: message
-        };
+        var submitBtn = document.getElementById('submit-entry-btn');
+        submitBtn.disabled = true;
 
-        entries.unshift(entry);
-        saveEntries(entries);
-        renderList();
-        showResult(entry);
-
-        input.value = '';
-        input.focus();
+        sb.from(TABLE)
+          .insert([{
+            user_id: currentUser.id,
+            text: text,
+            emotion: emotionResult.emotion,
+            intensity: emotionResult.intensity,
+            emoji: emotionResult.emoji,
+            message: message
+          }])
+          .select()
+          .then(function (res) {
+            submitBtn.disabled = false;
+            if (res.error) {
+              hint.textContent = '기록에 실패했어요: ' + res.error.message;
+              return;
+            }
+            var entry = res.data[0];
+            entries.unshift(entry);
+            renderList();
+            showResult(entry);
+            input.value = '';
+            input.focus();
+          })
+          .catch(function (err) {
+            submitBtn.disabled = false;
+            hint.textContent = '기록 중 오류가 발생했어요: ' + err.message;
+          });
       });
 
-      renderList();
+      showLoggedOut();
     })();
   </script>
 </body>
