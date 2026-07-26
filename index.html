@@ -342,14 +342,18 @@
 
     <main>
       <section class="card auth-card" id="auth-card" aria-labelledby="auth-title">
-        <h2 id="auth-title" class="section-title">이메일로 로그인</h2>
-        <p class="auth-desc">비밀번호 없이, 이메일로 받은 링크를 클릭하면 로그인돼요. 로그인한 회원들은 서로의 기록을 함께 볼 수 있어요.</p>
+        <h2 id="auth-title" class="section-title">회원 로그인</h2>
+        <p class="auth-desc">이메일 주소와 공통 비밀번호를 입력해 주세요. 처음 오신 분은 자동으로 회원가입돼요. 로그인한 회원들은 서로의 기록을 함께 볼 수 있어요.</p>
 
         <form id="email-form" novalidate>
           <label for="auth-email">이메일 주소</label>
           <div class="input-row">
             <input type="email" id="auth-email" name="auth-email" placeholder="you@example.com" autocomplete="email" required>
-            <button type="submit" id="send-code-btn">로그인 링크 받기</button>
+          </div>
+          <label for="auth-password" style="margin-top:14px;">비밀번호</label>
+          <div class="input-row">
+            <input type="password" id="auth-password" name="auth-password" autocomplete="current-password" required>
+            <button type="submit" id="send-code-btn">로그인 / 가입</button>
           </div>
         </form>
 
@@ -784,12 +788,12 @@
     (function () {
       var SUPABASE_URL = 'https://vlfcssavypbwrtrjhxln.supabase.co';
       var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZsZmNzc2F2eXBid3J0cmpoeGxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwNTI3NjUsImV4cCI6MjEwMDYyODc2NX0.k5RckRGNuAmUeVCz071FNGoeO3VzsPl_HFRcRMXveH0';
-      var SITE_URL = 'https://horimi71.github.io/emotion_diary/';
       var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       var TABLE = 'diary_entries';
 
       var emailForm = document.getElementById('email-form');
       var authEmail = document.getElementById('auth-email');
+      var authPassword = document.getElementById('auth-password');
       var authHint = document.getElementById('auth-hint');
       var authCard = document.getElementById('auth-card');
       var appContent = document.getElementById('app-content');
@@ -806,29 +810,47 @@
       emailForm.addEventListener('submit', function (e) {
         e.preventDefault();
         var email = authEmail.value.trim();
+        var password = authPassword.value;
+
         if (!email) {
           setAuthHint('이메일 주소를 입력해 주세요.');
           return;
         }
+        if (!password) {
+          setAuthHint('비밀번호를 입력해 주세요.');
+          return;
+        }
+
         var btn = document.getElementById('send-code-btn');
         btn.disabled = true;
-        setAuthHint('로그인 링크를 보내는 중이에요...');
+        setAuthHint('로그인하는 중이에요...');
 
-        sb.auth.signInWithOtp({
-          email: email,
-          options: { shouldCreateUser: true, emailRedirectTo: SITE_URL }
-        })
-          .then(function (res) {
-            btn.disabled = false;
-            if (res.error) {
-              setAuthHint('로그인 링크 발송에 실패했어요: ' + res.error.message);
+        sb.auth.signInWithPassword({ email: email, password: password })
+          .then(function (signInRes) {
+            if (!signInRes.error) {
+              btn.disabled = false;
+              setAuthHint('');
               return;
             }
-            setAuthHint(email + ' 주소로 로그인 링크를 보냈어요. 메일함에서 링크를 클릭해 주세요.');
+
+            setAuthHint('회원가입하는 중이에요...');
+            return sb.auth.signUp({ email: email, password: password })
+              .then(function (signUpRes) {
+                btn.disabled = false;
+                if (signUpRes.error) {
+                  setAuthHint('로그인에 실패했어요: ' + signUpRes.error.message);
+                  return;
+                }
+                if (!signUpRes.data.session) {
+                  setAuthHint('가입은 됐지만 자동 로그인이 되지 않았어요. 다시 로그인 버튼을 눌러주세요.');
+                  return;
+                }
+                setAuthHint('');
+              });
           })
           .catch(function (err) {
             btn.disabled = false;
-            setAuthHint('로그인 링크 발송 중 오류가 발생했어요: ' + err.message);
+            setAuthHint('로그인 중 오류가 발생했어요: ' + err.message);
           });
       });
 
@@ -839,12 +861,14 @@
       function showLoggedOut() {
         authCard.style.display = 'block';
         appContent.classList.remove('visible');
+        authPassword.value = '';
       }
 
       function showLoggedIn(user) {
         currentUser = user;
         authCard.style.display = 'none';
         appContent.classList.add('visible');
+        authPassword.value = '';
         userEmailLabel.textContent = user.email;
         loadEntries();
         subscribeRealtime();
