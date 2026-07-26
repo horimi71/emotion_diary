@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 공감 다이어리</title>
+<style>
+  :root {
+    --bg: #faf5ec;
+    --paper: #fffdf8;
+    --ink: #4a3f35;
+    --ink-soft: #7a6f61;
+    --accent: #d98c6b;
+    --accent-soft: #f3ddc9;
+    --border: #ece2d2;
+    --shadow: 0 8px 24px rgba(120, 96, 62, 0.12);
+    --radius: 20px;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background: linear-gradient(180deg, #faf5ec 0%, #f6efe1 100%);
+    color: var(--ink);
+    font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", -apple-system, sans-serif;
+    line-height: 1.6;
+    min-height: 100vh;
+    padding: 32px 16px 64px;
+  }
+
+  .page {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  header.app-header {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+
+  header.app-header h1 {
+    font-size: 1.8rem;
+    margin: 0 0 6px;
+    letter-spacing: -0.02em;
+  }
+
+  header.app-header p {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+  }
+
+  .card {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+  }
+
+  .entry-form {
+    margin-bottom: 24px;
+  }
+
+  .entry-form label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 10px;
+    font-size: 0.95rem;
+  }
+
+  .entry-form .input-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .entry-form input[type="text"] {
+    flex: 1 1 240px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: #fffefb;
+    color: var(--ink);
+    font-size: 1rem;
+    font-family: inherit;
+    min-width: 0;
+  }
+
+  .entry-form input[type="text"]:focus {
+    outline: 3px solid var(--accent-soft);
+    outline-offset: 1px;
+    border-color: var(--accent);
+  }
+
+  .entry-form button {
+    flex: 0 0 auto;
+    padding: 14px 22px;
+    border-radius: 14px;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s ease, transform 0.1s ease;
+  }
+
+  .entry-form button:hover {
+    background: #c97b58;
+  }
+
+  .entry-form button:active {
+    transform: translateY(1px);
+  }
+
+  .entry-form button:focus-visible,
+  .entry-form input[type="text"]:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .form-hint {
+    margin: 8px 2px 0;
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+    min-height: 1.2em;
+  }
+
+  .result-card {
+    margin-bottom: 28px;
+    display: none;
+  }
+
+  .result-card.visible {
+    display: block;
+  }
+
+  .result-card h2 {
+    margin: 0 0 14px;
+    font-size: 1rem;
+    color: var(--ink-soft);
+    font-weight: 600;
+  }
+
+  .emotion-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 14px;
+  }
+
+  .emotion-badge .emoji {
+    font-size: 1.2rem;
+  }
+
+  .empathy-message {
+    margin: 0;
+    font-size: 1.05rem;
+    line-height: 1.7;
+  }
+
+  [data-emotion="joy"]      { background: #fdead0; color: #8a5a00; }
+  [data-emotion="sad"]      { background: #dde8f5; color: #2d5a8c; }
+  [data-emotion="angry"]    { background: #f9dcd9; color: #9c3b3b; }
+  [data-emotion="anxious"]  { background: #e6ddf3; color: #5b3d8c; }
+  [data-emotion="tired"]    { background: #e6e1d8; color: #5c5347; }
+  [data-emotion="calm"]     { background: #dcecdf; color: #366b47; }
+  [data-emotion="grateful"] { background: #fdeccf; color: #8a6300; }
+  [data-emotion="lonely"]   { background: #e2e4ef; color: #3f4a7a; }
+  [data-emotion="neutral"]  { background: #ece6db; color: #5c5347; }
+  [data-emotion="crisis"]   { background: #f6d9d9; color: #a13d3d; }
+
+  .result-card.crisis {
+    border-color: #e3b7b7;
+  }
+
+  section.diary-log h2 {
+    font-size: 1.05rem;
+    margin: 0 0 14px 4px;
+    color: var(--ink-soft);
+  }
+
+  .diary-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .diary-item {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    padding: 18px 20px;
+  }
+
+  .diary-item .meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+
+  .diary-item time {
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+  }
+
+  .diary-item .emotion-badge {
+    margin-bottom: 0;
+    padding: 5px 12px;
+    font-size: 0.85rem;
+  }
+
+  .diary-item .diary-text {
+    margin: 0 0 10px;
+    font-size: 1rem;
+    word-break: break-word;
+  }
+
+  .diary-item .diary-response {
+    margin: 0;
+    font-size: 0.92rem;
+    color: var(--ink-soft);
+    border-top: 1px dashed var(--border);
+    padding-top: 10px;
+    line-height: 1.6;
+  }
+
+  .empty-state {
+    text-align: center;
+    color: var(--ink-soft);
+    padding: 24px 16px;
+    font-size: 0.92rem;
+  }
+
+  @media (max-width: 420px) {
+    body {
+      padding: 20px 10px 48px;
+    }
+
+    .card {
+      padding: 18px;
+    }
+
+    .entry-form .input-row {
+      flex-direction: column;
+    }
+
+    .entry-form button {
+      width: 100%;
+    }
+
+    header.app-header h1 {
+      font-size: 1.5rem;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <header class="app-header">
+      <h1>AI 공감 다이어리</h1>
+      <p>오늘 하루를 한 줄로 적으면, 마음을 함께 들여다봐 드릴게요.</p>
+    </header>
+
+    <main>
+      <section class="card entry-form" aria-labelledby="entry-form-title">
+        <h2 id="entry-form-title" class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">오늘의 기록 작성</h2>
+        <form id="diary-form" novalidate>
+          <label for="diary-input">오늘 있었던 일을 한 줄로 적어보세요</label>
+          <div class="input-row">
+            <input
+              type="text"
+              id="diary-input"
+              name="diary-input"
+              placeholder="예: 오늘 오랜만에 친구를 만나서 즐거웠다"
+              autocomplete="off"
+              maxlength="500"
+              required
+            >
+            <button type="submit">기록하기</button>
+          </div>
+          <p class="form-hint" id="form-hint" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section class="card result-card" id="result-card" aria-live="polite" aria-atomic="true">
+        <h2>방금 남긴 마음</h2>
+        <span class="emotion-badge" id="result-badge">
+          <span class="emoji" id="result-emoji"></span>
+          <span id="result-emotion-name"></span>
+        </span>
+        <p class="empathy-message" id="result-message"></p>
+      </section>
+
+      <section class="diary-log" aria-labelledby="diary-log-title">
+        <h2 id="diary-log-title">지금까지의 기록</h2>
+        <ul class="diary-list" id="diary-list"></ul>
+        <p class="empty-state" id="empty-state">아직 기록된 하루가 없어요. 오늘의 한 줄을 남겨보세요.</p>
+      </section>
+    </main>
+  </div>
+
+  <script>
+(function (global) {
+  'use strict';
+
+  var MAX_ANALYZE_LENGTH = 3000;
+
+  function stripSpaces(s) {
+    return String(s).replace(/\s+/g, '');
+  }
+
+  var CRISIS_KEYWORDS = [
+    '죽고싶다', '죽고싶어', '죽고파', '죽어버리고싶다',
+    '자살하고싶다', '자살할것같다', '자살충동', '자살시도', '자살',
+    '자해하고싶다', '자해했다', '자해',
+    '사라지고싶다', '사라져버리고싶다', '이세상에서사라지고싶다',
+    '살고싶지않다', '살기싫다', '삶을끝내고싶다', '삶을포기하고싶다',
+    '목숨을끊고싶다', '목숨을끊고', '뛰어내리고싶다', '존재를끝내고싶다'
+  ];
+
+  var INTENSIFIERS = ['너무', '정말', '진짜', '완전', '엄청', '매우', '굉장히', '심하게', '극도로', '너무너무'];
+
+  var EMOTION_KEYWORDS = {
+    '기쁨': [
+      ['행복', 2], ['기쁘', 2], ['기뻐', 2], ['기뻤', 2],
+      ['즐겁', 2], ['즐거워', 2], ['즐거웠', 2],
+      ['신나', 2], ['신났', 2],
+      ['최고', 2], ['좋', 1],
+      ['웃었', 1], ['웃음', 1],
+      ['설레', 2], ['설렜', 2],
+      ['뿌듯', 2], ['성공', 2], ['합격', 2], ['승진', 2], ['축하', 1],
+      ['재밌', 1], ['재미있', 1]
+    ],
+    '슬픔': [
+      ['슬프', 2], ['슬퍼', 2], ['슬펐', 2],
+      ['눈물', 2],
+      ['울었', 2], ['울어', 1], ['울고싶', 2],
+      ['우울', 2], ['속상', 2],
+      ['아프', 1], ['아파', 1], ['아팠', 1],
+      ['서럽', 2], ['서러워', 2], ['서러웠', 2],
+      ['그립', 1], ['그리워', 1], ['그리웠', 1],
+      ['아쉽', 1], ['아쉬워', 1], ['아쉬웠', 1],
+      ['실망', 2], ['상실감', 2], ['이별', 1],
+      ['헤어지', 2], ['헤어졌', 2],
+      ['먹먹', 1]
+    ],
+    '화남': [
+      ['화나', 2], ['화났', 2], ['화가나', 2],
+      ['짜증', 2],
+      ['열받', 2],
+      ['빡치', 2], ['빡쳤', 2],
+      ['억울', 2],
+      ['분하', 2], ['분했', 2],
+      ['미치겠', 1],
+      ['답답', 1],
+      ['싫', 1],
+      ['극혐', 2],
+      ['불쾌', 1],
+      ['어이없', 1]
+    ],
+    '불안': [
+      ['불안', 2], ['걱정', 1], ['초조', 2], ['긴장', 1],
+      ['두렵', 2], ['두려워', 2], ['두려웠', 2],
+      ['무섭', 2], ['무서워', 2], ['무서웠', 2],
+      ['조마조마', 2],
+      ['떨리', 1], ['떨렸', 1],
+      ['스트레스', 1],
+      ['막막', 2], ['압박감', 1]
+    ],
+    '지침/피로': [
+      ['피곤', 2],
+      ['지치', 2], ['지쳤', 2],
+      ['힘들', 2],
+      ['녹초', 2],
+      ['무기력', 2],
+      ['지겹', 1], ['지겨워', 1], ['지겨웠', 1],
+      ['번아웃', 2],
+      ['졸리', 1], ['졸렸', 1],
+      ['쉬고싶', 1],
+      ['탈진', 2],
+      ['기운이없', 2], ['기운없', 2]
+    ],
+    '평온': [
+      ['평온', 2], ['편안', 2], ['안정', 1], ['차분', 2],
+      ['여유', 1], ['고요', 2], ['잔잔', 2], ['만족', 1],
+      ['평화', 2], ['느긋', 1]
+    ],
+    '감사': [
+      ['감사', 2], ['고맙', 2], ['고마워', 2], ['고마웠', 2],
+      ['은혜', 1], ['소중', 1], ['감동', 2], ['다행', 1]
+    ],
+    '외로움': [
+      ['외롭', 2], ['외로워', 2], ['외로웠', 2],
+      ['쓸쓸', 2], ['혼자', 1], ['고독', 2],
+      ['허전', 2], ['공허', 2], ['적적', 1]
+    ],
+    '중립': [
+      ['그냥', 1], ['평범', 1], ['무난', 1], ['별일없', 1],
+      ['똑같', 1], ['그저그렇', 1], ['보통', 1]
+    ]
+  };
+
+  var EMOJI = {
+    '기쁨': '😊', '슬픔': '😢', '화남': '😠', '불안': '😰',
+    '지침/피로': '😪', '평온': '😌', '감사': '🙏', '외로움': '🥺',
+    '중립': '🙂', '위기': '🆘'
+  };
+
+  function analyzeEmotion(text) {
+    if (typeof text !== 'string' || text.trim().length === 0) {
+      return { emotion: '중립', intensity: 'low', emoji: EMOJI['중립'], confidence: 0 };
+    }
+
+    var trimmed = text.trim();
+    var analysisText = trimmed.length > MAX_ANALYZE_LENGTH ? trimmed.slice(0, MAX_ANALYZE_LENGTH) : trimmed;
+    var compact = stripSpaces(analysisText);
+
+    for (var i = 0; i < CRISIS_KEYWORDS.length; i++) {
+      if (compact.indexOf(stripSpaces(CRISIS_KEYWORDS[i])) !== -1) {
+        return { emotion: '위기', intensity: 'high', emoji: EMOJI['위기'], confidence: 0.95, isCrisis: true };
+      }
+    }
+
+    var boost = 1;
+    if (INTENSIFIERS.some(function (w) { return compact.indexOf(w) !== -1; })) boost *= 1.4;
+    if (/[!?]{2,}/.test(analysisText)) boost *= 1.2;
+
+    var scores = {};
+    var lastIdx = {};
+    Object.keys(EMOTION_KEYWORDS).forEach(function (cat) {
+      var s = 0, li = -1;
+      EMOTION_KEYWORDS[cat].forEach(function (pair) {
+        var word = stripSpaces(pair[0]);
+        var weight = pair[1];
+        var idx = compact.indexOf(word);
+        if (idx !== -1) {
+          s += weight;
+          if (idx > li) li = idx;
+        }
+      });
+      scores[cat] = s;
+      lastIdx[cat] = li;
+    });
+
+    if (/ㅠ{2,}|ㅜ{2,}/.test(compact)) scores['슬픔'] = (scores['슬픔'] || 0) + 1;
+    if (/ㅋ{2,}|ㅎ{2,}/.test(compact)) scores['기쁨'] = (scores['기쁨'] || 0) + 1;
+
+    Object.keys(scores).forEach(function (cat) {
+      if (scores[cat] > 0) scores[cat] *= boost;
+    });
+
+    var entries = Object.keys(scores)
+      .map(function (cat) { return [cat, scores[cat]]; })
+      .filter(function (e) { return e[1] > 0; });
+
+    if (entries.length === 0) {
+      return { emotion: '중립', intensity: 'low', emoji: EMOJI['중립'], confidence: 0.25 };
+    }
+
+    entries.sort(function (a, b) {
+      return b[1] - a[1] || lastIdx[b[0]] - lastIdx[a[0]];
+    });
+
+    var primaryCat = entries[0][0];
+    var primaryScore = entries[0][1];
+    var secondaryCat = null;
+    if (entries.length > 1) {
+      var secCat = entries[1][0];
+      var secScore = entries[1][1];
+      if (secScore >= primaryScore * 0.55 && secCat !== primaryCat) secondaryCat = secCat;
+    }
+
+    var total = entries.reduce(function (sum, e) { return sum + e[1]; }, 0);
+    var confidence = 0.4 + (primaryScore / (total + 1)) * 0.5;
+    if (compact.length <= 4) confidence *= 0.7;
+    confidence = Math.max(0.2, Math.min(0.97, Math.round(confidence * 100) / 100));
+
+    var intensity = 'low';
+    if (primaryScore >= 4.5) intensity = 'high';
+    else if (primaryScore >= 2.2) intensity = 'medium';
+
+    return {
+      emotion: primaryCat,
+      intensity: intensity,
+      emoji: EMOJI[primaryCat] || EMOJI['중립'],
+      confidence: confidence,
+      secondaryEmotion: secondaryCat
+    };
+  }
+
+  var RESPONSE_TEMPLATES = {
+    '기쁨': {
+      low: [
+        '잔잔하게 기분 좋은 하루였나 봐요. 그런 소소한 기쁨도 오래 남는 법이죠.',
+        '작지만 분명한 좋은 일이 있었네요. 그 기분, 오늘 하루 잘 데리고 가시길요.'
+      ],
+      medium: [
+        '오늘 있었던 좋은 일, 저도 같이 웃게 되네요. 그 기분 마음껏 누리셔도 돼요.',
+        '기분 좋은 순간이었겠어요. 그런 날은 마음에 오래 담아두셔도 좋을 것 같아요.'
+      ],
+      high: [
+        '정말 기쁜 하루였겠어요! 그 벅찬 마음이 여기까지 느껴져요.',
+        '이렇게 신나는 일이 있었다니, 저까지 덩달아 기분이 좋아지네요. 오늘만큼은 마음껏 기뻐하세요.'
+      ]
+    },
+    '슬픔': {
+      low: [
+        '마음 한켠이 조금 무거웠던 하루였을 것 같아요. 그 마음, 그냥 그대로 있어도 괜찮아요.',
+        '살짝 가라앉은 기분이었나 봐요. 무리해서 털어내지 않아도 돼요.'
+      ],
+      medium: [
+        '오늘 마음이 많이 시렸겠어요. 그 감정을 굳이 숨기지 않으셔도 괜찮아요, 여기선.',
+        '속상한 일이 있었군요. 그 마음을 이렇게 적어낸 것만으로도 이미 잘 견뎌내고 계신 거예요.'
+      ],
+      high: [
+        '정말 많이 힘든 하루였겠어요. 그 슬픔이 얼마나 컸을지, 온전히 다 헤아릴 순 없어도 곁에서 함께 느끼고 싶어요.',
+        '눈물이 날 만큼 힘든 일이 있었나 봐요. 지금은 그냥 실컷 슬퍼해도 괜찮아요.'
+      ]
+    },
+    '화남': {
+      low: [
+        '조금 신경 쓰이는 일이 있었나 봐요. 그 정도 짜증은 누구나 나는 거예요.',
+        '마음이 살짝 불편했던 순간이었겠어요. 그럴 수 있어요.'
+      ],
+      medium: [
+        '화가 날 만한 일이었네요. 그 감정, 억누르지 않고 이렇게 적어낸 것도 잘하신 거예요.',
+        '속에서 열이 올라올 만큼 답답한 하루였겠어요. 그 마음 충분히 이해돼요.'
+      ],
+      high: [
+        '정말 화가 많이 나는 일이었겠어요. 그 억울함, 참지 않고 털어놓으셔도 괜찮아요.',
+        '얼마나 분했으면 이렇게까지 화가 났을까 싶어요. 오늘만큼은 그 감정에 솔직해지셔도 돼요.'
+      ]
+    },
+    '불안': {
+      low: [
+        '마음이 살짝 조마조마했던 하루였나 봐요. 그 정도 긴장은 자연스러운 거예요.',
+        '약간 신경 쓰이는 일이 있었던 것 같아요. 너무 앞서 걱정하진 않으셔도 돼요.'
+      ],
+      medium: [
+        '걱정되는 일이 마음을 계속 맴돌았겠어요. 그 불안, 혼자 끌어안지 않으셨으면 해요.',
+        '긴장되고 초조한 하루였겠어요. 지금 이 순간만이라도 숨 한번 크게 쉬어보셔도 좋아요.'
+      ],
+      high: [
+        '많이 두렵고 불안한 하루였겠어요. 그 마음이 얼마나 무거웠을지 짐작이 가요.',
+        '막막함이 크게 밀려온 하루였나 봐요. 그 불안을 이렇게 꺼내놓은 것만으로도 의미가 있어요.'
+      ]
+    },
+    '지침/피로': {
+      low: [
+        '살짝 나른한 하루였나 봐요. 오늘은 조금 일찍 쉬어가도 좋을 것 같아요.',
+        '은근히 지치는 하루였겠어요. 잠깐이라도 숨 돌릴 틈을 가져보세요.'
+      ],
+      medium: [
+        '정말 애쓴 하루였네요. 몸도 마음도 잠시 내려놓고 쉬어도 괜찮아요.',
+        '지칠 만큼 열심히 보낸 하루였겠어요. 오늘의 나에게 잘했다고 말해주고 싶네요.'
+      ],
+      high: [
+        '완전히 녹초가 될 만큼 힘든 하루였겠어요. 지금은 아무것도 하지 않고 그냥 쉬어도 돼요.',
+        '많이 지치셨겠어요. 버텨내느라 고생 많으셨어요, 오늘만큼은 푹 쉬어가시길요.'
+      ]
+    },
+    '평온': {
+      low: [
+        '잔잔하게 흘러간 하루였나 봐요. 그런 무탈한 하루도 참 소중해요.',
+        '특별한 일 없이 평온했던 하루였겠어요. 그 잔잔함이 나쁘지 않죠.'
+      ],
+      medium: [
+        '마음이 편안한 하루를 보내셨나 봐요. 그런 안정감, 오래 지켜가시길요.',
+        '차분하게 하루를 마무리하신 것 같아요. 그 평온함이 참 좋아 보여요.'
+      ],
+      high: [
+        '정말 평화로운 하루였겠어요. 그런 온전한 편안함을 느낄 수 있었다니 다행이에요.',
+        '마음 깊이 여유로운 하루였나 봐요. 그 고요함을 충분히 누리셨길 바라요.'
+      ]
+    },
+    '감사': {
+      low: [
+        '작은 것에도 고마움을 느낀 하루였나 봐요. 그런 마음이 하루를 따뜻하게 만들죠.',
+        '소소하게 감사한 순간이 있었나 봐요. 그런 마음, 참 예뻐요.'
+      ],
+      medium: [
+        '고마운 마음이 가득했던 하루였겠어요. 그 감정을 알아차린 것만으로도 의미 있어요.',
+        '누군가에게, 혹은 오늘 하루에 감사함을 느끼셨나 봐요. 그런 마음이 참 따뜻하네요.'
+      ],
+      high: [
+        '가슴 깊이 감사함이 차오른 하루였겠어요. 그런 벅찬 고마움, 오래 기억하셔도 좋을 것 같아요.',
+        '정말 감동적인 하루였나 봐요. 그 마음이 여기까지 따뜻하게 전해져요.'
+      ]
+    },
+    '외로움': {
+      low: [
+        '살짝 허전한 기분이 스쳤던 하루였나 봐요. 그런 순간, 누구에게나 있죠.',
+        '조금 쓸쓸한 느낌이 들었던 것 같아요. 그 마음도 자연스러운 거예요.'
+      ],
+      medium: [
+        '혼자라는 느낌이 크게 다가온 하루였겠어요. 그 마음, 이렇게라도 적어낸 게 다행이에요.',
+        '마음이 많이 허전했겠어요. 곁에 아무도 없다는 느낌, 참 힘들죠.'
+      ],
+      high: [
+        '정말 많이 외로웠던 하루였겠어요. 그 공허함을 혼자 견디느라 힘드셨을 것 같아요.',
+        '깊은 외로움이 밀려온 하루였나 봐요. 지금 이 순간, 그 마음을 누군가 알아준다는 것만으로도 조금은 위안이 되길 바라요.'
+      ]
+    },
+    '중립': {
+      low: [
+        '특별한 감정 없이 무난하게 흘러간 하루였나 봐요. 그런 날도 있는 거죠.',
+        '그냥 그런 하루였나 봐요. 담백하게 하루를 넘긴 것도 나쁘지 않아요.'
+      ],
+      medium: [
+        '오늘 하루는 이렇다 할 색깔 없이 지나갔나 봐요. 그런 잔잔한 하루도 소중히 기록해두셨네요.',
+        '특별할 것 없는 하루였어도, 이렇게 기록해두신 것 자체가 의미 있어요.'
+      ],
+      high: [
+        '무난하게, 그러나 꾸준히 하루를 살아내셨네요. 그것만으로도 충분해요.',
+        '큰 굴곡 없이 하루를 잘 마무리하신 것 같아요. 평범한 하루도 잘 쌓이면 단단한 하루가 되죠.'
+      ]
+    }
+  };
+
+  var MIXED_HINTS = {
+    '기쁨': '기쁜 마음도 함께 느껴져요',
+    '슬픔': '슬픈 마음도 함께 있는 것 같아요',
+    '화남': '화가 나는 마음도 섞여 있는 것 같아요',
+    '불안': '불안한 마음도 함께 있는 것 같아요',
+    '지침/피로': '지친 마음도 함께 있는 것 같아요',
+    '평온': '평온한 마음도 함께 느껴져요',
+    '감사': '감사한 마음도 함께 있는 것 같아요',
+    '외로움': '외로운 마음도 함께 있는 것 같아요'
+  };
+
+  var EMPTY_INPUT_TEMPLATES = [
+    '오늘 무슨 일이 있었는지 한 줄만 적어주시면, 그 마음을 함께 느껴볼게요.',
+    '아직 적어주신 이야기가 없네요. 짧아도 괜찮으니 오늘 하루를 한 줄로 들려주세요.'
+  ];
+
+  var CRISIS_TEMPLATES = [
+    '지금 많이 힘드신 마음이 느껴져요. 그 마음을 혼자 짊어지지 않으셨으면 해요. 언제든 자살예방상담전화 1393(24시간, 전국 어디서나 국번 없이)으로 전화하시면 도움을 받으실 수 있어요. 지금 이 순간, 당신은 혼자가 아니에요.',
+    '괜찮다는 말 대신, 지금 얼마나 힘드신지 먼저 여쭤보고 싶어요. 그런 마음이 들 정도로 많이 지치셨을 것 같아요. 자살예방상담전화 1393, 정신건강 위기상담전화 1577-0199로 연락하시면 24시간 누군가와 이야기 나누실 수 있어요. 부디 혼자 견디지 마세요.',
+    '그런 생각이 들 만큼 지금 마음이 많이 아프신 것 같아요. 이 감정을 전문가와 함께 나눠보시길 진심으로 권해드려요. 자살예방상담전화 1393(전국, 24시간)이나 정신건강 위기상담전화 1577-0199로 연락해보세요. 당신의 이야기를 들어줄 사람이 분명히 있어요.'
+  ];
+
+  function pick(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  function pickTemplate(category, intensity) {
+    var pool = RESPONSE_TEMPLATES[category] || RESPONSE_TEMPLATES['중립'];
+    var arr = pool[intensity] || pool.medium || pool.low;
+    return pick(arr);
+  }
+
+  function generateEmpathyResponse(emotionResult, text) {
+    if (typeof text !== 'string' || text.trim().length === 0) {
+      return pick(EMPTY_INPUT_TEMPLATES);
+    }
+    if (!emotionResult || typeof emotionResult !== 'object') {
+      emotionResult = analyzeEmotion(text);
+    }
+    if (emotionResult.emotion === '위기' || emotionResult.isCrisis) {
+      return pick(CRISIS_TEMPLATES);
+    }
+
+    var base = pickTemplate(emotionResult.emotion, emotionResult.intensity || 'medium');
+
+    if (
+      emotionResult.secondaryEmotion &&
+      emotionResult.secondaryEmotion !== emotionResult.emotion &&
+      MIXED_HINTS[emotionResult.secondaryEmotion]
+    ) {
+      base += ' ' + MIXED_HINTS[emotionResult.secondaryEmotion] + '.';
+    }
+
+    return base;
+  }
+
+  global.analyzeEmotion = analyzeEmotion;
+  global.generateEmpathyResponse = generateEmpathyResponse;
+})(window);
+  </script>
+  <script>
+    (function () {
+      var STORAGE_KEY = 'ai-empathy-diary-entries';
+
+      var form = document.getElementById('diary-form');
+      var input = document.getElementById('diary-input');
+      var hint = document.getElementById('form-hint');
+      var resultCard = document.getElementById('result-card');
+      var resultBadge = document.getElementById('result-badge');
+      var resultEmoji = document.getElementById('result-emoji');
+      var resultEmotionName = document.getElementById('result-emotion-name');
+      var resultMessage = document.getElementById('result-message');
+      var diaryList = document.getElementById('diary-list');
+      var emptyState = document.getElementById('empty-state');
+
+      resultCard.classList.remove('visible', 'crisis');
+
+      var EMOTION_STYLE_KEY = {
+        '기쁨': 'joy',
+        '슬픔': 'sad',
+        '화남': 'angry',
+        '불안': 'anxious',
+        '지침/피로': 'tired',
+        '평온': 'calm',
+        '감사': 'grateful',
+        '외로움': 'lonely',
+        '중립': 'neutral',
+        '위기': 'crisis'
+      };
+
+      function loadEntries() {
+        try {
+          var raw = localStorage.getItem(STORAGE_KEY);
+          var parsed = raw ? JSON.parse(raw) : [];
+          return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+          return [];
+        }
+      }
+
+      function saveEntries(entries) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+        } catch (e) {
+          /* localStorage unavailable, silently ignore */
+        }
+      }
+
+      var entries = loadEntries();
+
+      function formatTimestamp(iso) {
+        var d = new Date(iso);
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleString('ko-KR', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      }
+
+      function buildBadge(emotion, emoji) {
+        var styleKey = EMOTION_STYLE_KEY[emotion] || 'neutral';
+        var wrap = document.createElement('span');
+        wrap.className = 'emotion-badge';
+        wrap.setAttribute('data-emotion', styleKey);
+
+        var emojiSpan = document.createElement('span');
+        emojiSpan.className = 'emoji';
+        emojiSpan.textContent = emoji;
+        emojiSpan.setAttribute('aria-hidden', 'true');
+
+        var nameSpan = document.createElement('span');
+        nameSpan.textContent = emotion;
+
+        wrap.appendChild(emojiSpan);
+        wrap.appendChild(nameSpan);
+        return wrap;
+      }
+
+      function renderList() {
+        diaryList.innerHTML = '';
+
+        if (entries.length === 0) {
+          emptyState.style.display = 'block';
+          return;
+        }
+        emptyState.style.display = 'none';
+
+        entries.forEach(function (entry) {
+          var li = document.createElement('li');
+          li.className = 'diary-item';
+
+          var meta = document.createElement('div');
+          meta.className = 'meta';
+
+          var time = document.createElement('time');
+          time.textContent = formatTimestamp(entry.createdAt);
+
+          meta.appendChild(time);
+          meta.appendChild(buildBadge(entry.emotion, entry.emoji));
+
+          var text = document.createElement('p');
+          text.className = 'diary-text';
+          text.textContent = entry.text;
+
+          var response = document.createElement('p');
+          response.className = 'diary-response';
+          response.textContent = entry.message;
+
+          li.appendChild(meta);
+          li.appendChild(text);
+          li.appendChild(response);
+          diaryList.appendChild(li);
+        });
+      }
+
+      function showResult(entry) {
+        var styleKey = EMOTION_STYLE_KEY[entry.emotion] || 'neutral';
+        resultBadge.setAttribute('data-emotion', styleKey);
+        resultEmoji.textContent = entry.emoji;
+        resultEmotionName.textContent = entry.emotion;
+        resultMessage.textContent = entry.message;
+        resultCard.classList.add('visible');
+        resultCard.classList.toggle('crisis', styleKey === 'crisis');
+      }
+
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var text = input.value.trim();
+
+        if (!text) {
+          hint.textContent = '내용을 입력한 뒤 기록해 주세요.';
+          input.focus();
+          return;
+        }
+
+        hint.textContent = '';
+
+        var emotionResult = analyzeEmotion(text);
+        var message = generateEmpathyResponse(emotionResult, text);
+
+        var entry = {
+          id: Date.now(),
+          text: text,
+          createdAt: new Date().toISOString(),
+          emotion: emotionResult.emotion,
+          intensity: emotionResult.intensity,
+          emoji: emotionResult.emoji,
+          message: message
+        };
+
+        entries.unshift(entry);
+        saveEntries(entries);
+        renderList();
+        showResult(entry);
+
+        input.value = '';
+        input.focus();
+      });
+
+      renderList();
+    })();
+  </script>
+</body>
+</html>
