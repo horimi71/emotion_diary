@@ -1126,7 +1126,6 @@
       }
 
       var reactionsByPhoto = {};
-      var downloadsByPhoto = {};
       var expandedPhotoByEntry = {};
 
       function toggleReaction(photoId, type) {
@@ -1150,34 +1149,20 @@
       }
 
       function handleDownload(photoId, url) {
-        if (downloadsByPhoto[photoId]) {
-          alert('이미 다운로드 하였습니다, 2번째 다운로드는 용량관계로 제한됩니다');
-          return;
-        }
-        sb.from('photo_downloads')
-          .insert([{ photo_id: photoId, user_id: currentUser.id }])
-          .then(function (res) {
-            if (res.error) {
-              downloadsByPhoto[photoId] = true;
-              alert('이미 다운로드 하였습니다, 2번째 다운로드는 용량관계로 제한됩니다');
-              return;
-            }
-            downloadsByPhoto[photoId] = true;
-            return fetch(url)
-              .then(function (r) { return r.blob(); })
-              .then(function (blob) {
-                var blobUrl = URL.createObjectURL(blob);
-                var a = document.createElement('a');
-                a.href = blobUrl;
-                a.download = 'diary-photo-' + photoId + '.jpg';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(blobUrl);
-              })
-              .catch(function (err) {
-                alert('다운로드 중 오류가 발생했어요: ' + err.message);
-              });
+        fetch(url)
+          .then(function (r) { return r.blob(); })
+          .then(function (blob) {
+            var blobUrl = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = 'diary-photo-' + photoId + '.jpg';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(blobUrl);
+          })
+          .catch(function (err) {
+            alert('다운로드 중 오류가 발생했어요: ' + err.message);
           });
       }
 
@@ -1282,19 +1267,15 @@
 
       function loadReactionsAndUserState(photoIds) {
         reactionsByPhoto = {};
-        downloadsByPhoto = {};
         if (!photoIds.length) return Promise.resolve();
-        return Promise.all([
-          sb.from('photo_reactions').select('*').in('photo_id', photoIds),
-          sb.from('photo_downloads').select('*').in('photo_id', photoIds)
-        ]).then(function (results) {
-          (results[0].data || []).forEach(function (r) {
-            var bucket = reactionsByPhoto[r.photo_id] || (reactionsByPhoto[r.photo_id] = { like: 0, dislike: 0, mine: null });
-            bucket[r.reaction] += 1;
-            if (r.user_id === currentUser.id) bucket.mine = r.reaction;
+        return sb.from('photo_reactions').select('*').in('photo_id', photoIds)
+          .then(function (res) {
+            (res.data || []).forEach(function (r) {
+              var bucket = reactionsByPhoto[r.photo_id] || (reactionsByPhoto[r.photo_id] = { like: 0, dislike: 0, mine: null });
+              bucket[r.reaction] += 1;
+              if (r.user_id === currentUser.id) bucket.mine = r.reaction;
+            });
           });
-          (results[1].data || []).forEach(function (d) { downloadsByPhoto[d.photo_id] = true; });
-        });
       }
 
       function renderAccountFilterOptions() {
