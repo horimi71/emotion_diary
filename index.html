@@ -182,26 +182,51 @@
     object-fit: cover;
   }
 
-  .photo-block {
-    margin-top: 12px;
+  .photo-thumb-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    margin-top: 10px;
   }
 
-  .photo-block img {
+  .photo-thumb-row:empty {
+    display: none;
+    margin-top: 0;
+  }
+
+  .photo-thumb-btn {
+    aspect-ratio: 1 / 1;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    background: var(--accent-soft);
+  }
+
+  .photo-thumb-btn.active {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .photo-thumb-btn img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .photo-expand-wrap:empty {
+    margin-top: 0;
+  }
+
+  .photo-expand-wrap img {
     width: 100%;
     height: auto;
     display: block;
     border-radius: 12px;
     border: 1px solid var(--border);
-  }
-
-  .photo-limit-msg {
-    margin: 0;
-    padding: 16px;
-    text-align: center;
-    font-size: 0.85rem;
-    color: var(--ink-soft);
-    background: var(--accent-soft);
-    border-radius: 12px;
+    margin-top: 10px;
   }
 
   .photo-actions {
@@ -998,6 +1023,7 @@
       var DAILY_PHOTO_LIMIT = 5;
       var QHD_WIDTH = 2560;
       var QHD_HEIGHT = 1440;
+      var THUMB_SIZE = 320;
       var previewObjectUrls = [];
 
       function clearPhotoPreview() {
@@ -1024,31 +1050,39 @@
         });
       });
 
-      function resizeIfNeeded(file) {
+      function resizeToCanvas(img, maxW, maxH, quality) {
+        var w = img.naturalWidth, h = img.naturalHeight;
+        var scale = Math.min(1, maxW / w, maxH / h);
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(w * scale));
+        canvas.height = Math.max(1, Math.round(h * scale));
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        return new Promise(function (resolve) {
+          canvas.toBlob(function (blob) { resolve(blob); }, 'image/jpeg', quality);
+        });
+      }
+
+      function makePhotoVariants(file) {
         return new Promise(function (resolve) {
           var objectUrl = URL.createObjectURL(file);
           var img = new Image();
           img.onload = function () {
-            var w = img.naturalWidth, h = img.naturalHeight;
-            if (w <= QHD_WIDTH && h <= QHD_HEIGHT) {
+            var baseName = (file.name || 'photo').replace(/\.[^.]+$/, '');
+            Promise.all([
+              resizeToCanvas(img, QHD_WIDTH, QHD_HEIGHT, 0.85),
+              resizeToCanvas(img, THUMB_SIZE, THUMB_SIZE, 0.6)
+            ]).then(function (blobs) {
               URL.revokeObjectURL(objectUrl);
-              resolve(file);
-              return;
-            }
-            var scale = Math.min(QHD_WIDTH / w, QHD_HEIGHT / h);
-            var canvas = document.createElement('canvas');
-            canvas.width = Math.round(w * scale);
-            canvas.height = Math.round(h * scale);
-            var ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            URL.revokeObjectURL(objectUrl);
-            canvas.toBlob(function (blob) {
-              if (!blob) { resolve(file); return; }
-              var baseName = (file.name || 'photo').replace(/\.[^.]+$/, '');
-              resolve(new File([blob], baseName + '.jpg', { type: 'image/jpeg' }));
-            }, 'image/jpeg', 0.85);
+              var fullBlob = blobs[0];
+              var thumbBlob = blobs[1];
+              resolve({
+                full: fullBlob ? new File([fullBlob], baseName + '.jpg', { type: 'image/jpeg' }) : file,
+                thumb: thumbBlob ? new File([thumbBlob], baseName + '-thumb.jpg', { type: 'image/jpeg' }) : file
+              });
+            });
           };
-          img.onerror = function () { URL.revokeObjectURL(objectUrl); resolve(file); };
+          img.onerror = function () { URL.revokeObjectURL(objectUrl); resolve({ full: file, thumb: file }); };
           img.src = objectUrl;
         });
       }
@@ -1066,14 +1100,21 @@
           });
       }
 
-      function uploadPhotosForEntry(files, entryId, userId) {
-        var uploads = files.map(function (file, idx) {
-          var path = userId + '/' + entryId + '/' + idx + '-' + Math.random().toString(36).slice(2) + '.jpg';
-          return sb.storage.from('diary-photos').upload(path, file).then(function (res) {
-            if (res.error) throw res.error;
-            var publicUrl = sb.storage.from('diary-photos').getPublicUrl(path).data.publicUrl;
+      function uploadPhotosForEntry(variants, entryId, userId) {
+        var uploads = variants.map(function (variant, idx) {
+          var rand = Math.random().toString(36).slice(2);
+          var fullPath = userId + '/' + entryId + '/' + idx + '-' + rand + '.jpg';
+          var thumbPath = userId + '/' + entryId + '/' + idx + '-' + rand + '-thumb.jpg';
+          return Promise.all([
+            sb.storage.from('diary-photos').upload(fullPath, variant.full),
+            sb.storage.from('diary-photos').upload(thumbPath, variant.thumb)
+          ]).then(function (results) {
+            if (results[0].error) throw results[0].error;
+            if (results[1].error) throw results[1].error;
+            var fullUrl = sb.storage.from('diary-photos').getPublicUrl(fullPath).data.publicUrl;
+            var thumbUrl = sb.storage.from('diary-photos').getPublicUrl(thumbPath).data.publicUrl;
             return sb.from('diary_photos')
-              .insert([{ entry_id: entryId, user_id: userId, url: publicUrl }])
+              .insert([{ entry_id: entryId, user_id: userId, url: fullUrl, thumb_url: thumbUrl }])
               .select()
               .then(function (r) {
                 if (r.error) throw r.error;
@@ -1085,24 +1126,8 @@
       }
 
       var reactionsByPhoto = {};
-      var viewsByPhoto = {};
-      var viewDecision = {};
       var downloadsByPhoto = {};
-
-      function decideView(photo) {
-        if (viewDecision[photo.id]) return viewDecision[photo.id];
-        var current = viewsByPhoto[photo.id] || 0;
-        if (current < 2) {
-          viewDecision[photo.id] = 'show';
-          viewsByPhoto[photo.id] = current + 1;
-          sb.from('photo_views')
-            .upsert({ photo_id: photo.id, user_id: currentUser.id, view_count: current + 1 }, { onConflict: 'photo_id,user_id' })
-            .then(function (res) { if (res.error) console.error(res.error); });
-        } else {
-          viewDecision[photo.id] = 'blocked';
-        }
-        return viewDecision[photo.id];
-      }
+      var expandedPhotoByEntry = {};
 
       function toggleReaction(photoId, type) {
         var current = reactionsByPhoto[photoId] || { like: 0, dislike: 0, mine: null };
@@ -1156,62 +1181,86 @@
           });
       }
 
-      function buildPhotoBlock(photo) {
-        var wrap = document.createElement('div');
-        wrap.className = 'photo-block';
+      function buildPhotoSection(entry) {
+        var photos = entry.photos || [];
+        if (!photos.length) return null;
 
-        if (!photo.id) {
-          var legacyImg = document.createElement('img');
-          legacyImg.src = photo.url;
-          legacyImg.alt = '첨부된 사진';
-          legacyImg.loading = 'lazy';
-          wrap.appendChild(legacyImg);
-          return wrap;
-        }
+        var container = document.createElement('div');
 
-        var decision = decideView(photo);
-        if (decision === 'blocked') {
-          var msg = document.createElement('p');
-          msg.className = 'photo-limit-msg';
-          msg.textContent = '3번째 조회는 용량관계로 제한됩니다';
-          wrap.appendChild(msg);
-        } else {
+        var row = document.createElement('div');
+        row.className = 'photo-thumb-row';
+
+        var expandWrap = document.createElement('div');
+        expandWrap.className = 'photo-expand-wrap';
+
+        function renderExpanded() {
+          expandWrap.innerHTML = '';
+          var expandedKey = expandedPhotoByEntry[entry.id];
+          if (!expandedKey) return;
+          var photo = photos.filter(function (p) { return (p.id || p.url) === expandedKey; })[0];
+          if (!photo) return;
+
           var img = document.createElement('img');
           img.src = photo.url;
           img.alt = '첨부된 사진';
-          img.loading = 'lazy';
-          wrap.appendChild(img);
+          expandWrap.appendChild(img);
+
+          if (photo.id) {
+            var actions = document.createElement('div');
+            actions.className = 'photo-actions';
+
+            var reaction = reactionsByPhoto[photo.id] || { like: 0, dislike: 0, mine: null };
+
+            var likeBtn = document.createElement('button');
+            likeBtn.type = 'button';
+            likeBtn.className = 'reaction-btn' + (reaction.mine === 'like' ? ' active' : '');
+            likeBtn.textContent = '👍 ' + reaction.like;
+            likeBtn.addEventListener('click', function () { toggleReaction(photo.id, 'like'); });
+
+            var dislikeBtn = document.createElement('button');
+            dislikeBtn.type = 'button';
+            dislikeBtn.className = 'reaction-btn' + (reaction.mine === 'dislike' ? ' active' : '');
+            dislikeBtn.textContent = '👎 ' + reaction.dislike;
+            dislikeBtn.addEventListener('click', function () { toggleReaction(photo.id, 'dislike'); });
+
+            var downloadBtn = document.createElement('button');
+            downloadBtn.type = 'button';
+            downloadBtn.className = 'download-btn';
+            downloadBtn.textContent = '다운로드';
+            downloadBtn.addEventListener('click', function () { handleDownload(photo.id, photo.url); });
+
+            actions.appendChild(likeBtn);
+            actions.appendChild(dislikeBtn);
+            actions.appendChild(downloadBtn);
+            expandWrap.appendChild(actions);
+          }
         }
 
-        var actions = document.createElement('div');
-        actions.className = 'photo-actions';
+        photos.forEach(function (photo) {
+          var photoKey = photo.id || photo.url;
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'photo-thumb-btn' + (expandedPhotoByEntry[entry.id] === photoKey ? ' active' : '');
 
-        var reaction = reactionsByPhoto[photo.id] || { like: 0, dislike: 0, mine: null };
+          var thumbImg = document.createElement('img');
+          thumbImg.src = photo.thumb_url || photo.url;
+          thumbImg.alt = '첨부된 사진 썸네일';
+          thumbImg.loading = 'lazy';
+          btn.appendChild(thumbImg);
 
-        var likeBtn = document.createElement('button');
-        likeBtn.type = 'button';
-        likeBtn.className = 'reaction-btn' + (reaction.mine === 'like' ? ' active' : '');
-        likeBtn.textContent = '👍 ' + reaction.like;
-        likeBtn.addEventListener('click', function () { toggleReaction(photo.id, 'like'); });
+          btn.addEventListener('click', function () {
+            expandedPhotoByEntry[entry.id] = expandedPhotoByEntry[entry.id] === photoKey ? null : photoKey;
+            renderList();
+          });
 
-        var dislikeBtn = document.createElement('button');
-        dislikeBtn.type = 'button';
-        dislikeBtn.className = 'reaction-btn' + (reaction.mine === 'dislike' ? ' active' : '');
-        dislikeBtn.textContent = '👎 ' + reaction.dislike;
-        dislikeBtn.addEventListener('click', function () { toggleReaction(photo.id, 'dislike'); });
+          row.appendChild(btn);
+        });
 
-        var downloadBtn = document.createElement('button');
-        downloadBtn.type = 'button';
-        downloadBtn.className = 'download-btn';
-        downloadBtn.textContent = '다운로드';
-        downloadBtn.addEventListener('click', function () { handleDownload(photo.id, photo.url); });
+        renderExpanded();
 
-        actions.appendChild(likeBtn);
-        actions.appendChild(dislikeBtn);
-        actions.appendChild(downloadBtn);
-        wrap.appendChild(actions);
-
-        return wrap;
+        container.appendChild(row);
+        container.appendChild(expandWrap);
+        return container;
       }
 
       var EMOTION_STYLE_KEY = {
@@ -1233,13 +1282,10 @@
 
       function loadReactionsAndUserState(photoIds) {
         reactionsByPhoto = {};
-        viewsByPhoto = {};
-        viewDecision = {};
         downloadsByPhoto = {};
         if (!photoIds.length) return Promise.resolve();
         return Promise.all([
           sb.from('photo_reactions').select('*').in('photo_id', photoIds),
-          sb.from('photo_views').select('*').in('photo_id', photoIds),
           sb.from('photo_downloads').select('*').in('photo_id', photoIds)
         ]).then(function (results) {
           (results[0].data || []).forEach(function (r) {
@@ -1247,8 +1293,7 @@
             bucket[r.reaction] += 1;
             if (r.user_id === currentUser.id) bucket.mine = r.reaction;
           });
-          (results[1].data || []).forEach(function (v) { viewsByPhoto[v.photo_id] = v.view_count; });
-          (results[2].data || []).forEach(function (d) { downloadsByPhoto[d.photo_id] = true; });
+          (results[1].data || []).forEach(function (d) { downloadsByPhoto[d.photo_id] = true; });
         });
       }
 
@@ -1415,9 +1460,8 @@
 
           li.appendChild(meta);
           li.appendChild(account);
-          (entry.photos || []).forEach(function (photo) {
-            li.appendChild(buildPhotoBlock(photo));
-          });
+          var photoSection = buildPhotoSection(entry);
+          if (photoSection) li.appendChild(photoSection);
           li.appendChild(text);
           li.appendChild(response);
           diaryList.appendChild(li);
@@ -1509,9 +1553,9 @@
             if (photoFiles.length) {
               hint.textContent = (hint.textContent ? hint.textContent + ' ' : '') + '사진을 준비하는 중이에요...';
             }
-            return Promise.all(photoFiles.map(resizeIfNeeded));
+            return Promise.all(photoFiles.map(makePhotoVariants));
           })
-          .then(function (resizedFiles) {
+          .then(function (variants) {
             return sb.from(TABLE)
               .insert([{
                 user_id: currentUser.id,
@@ -1526,11 +1570,11 @@
               .then(function (res) {
                 if (res.error) throw res.error;
                 var entry = res.data[0];
-                if (!resizedFiles.length) {
+                if (!variants.length) {
                   entry.photos = [];
                   return entry;
                 }
-                return uploadPhotosForEntry(resizedFiles, entry.id, currentUser.id).then(function (photos) {
+                return uploadPhotosForEntry(variants, entry.id, currentUser.id).then(function (photos) {
                   entry.photos = photos;
                   return entry;
                 });
