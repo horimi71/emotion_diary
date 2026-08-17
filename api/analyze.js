@@ -64,7 +64,8 @@ module.exports = async function handler(req, res) {
           { role: 'user', content: text.slice(0, 1000) }
         ],
         temperature: 0.8,
-        max_tokens: 300
+        max_tokens: 800,
+        response_format: { type: 'json_object' }
       }),
       signal: controller.signal
     });
