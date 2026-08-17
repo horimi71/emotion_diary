@@ -151,7 +151,8 @@
 
   .photo-row {
     display: flex;
-    gap: 8px;
+    flex-direction: column;
+    gap: 10px;
     margin-top: 10px;
   }
 
@@ -161,17 +162,100 @@
   }
 
   .photo-row img {
-    flex: 1 1 0;
-    min-width: 0;
-    aspect-ratio: 1 / 1;
-    object-fit: cover;
+    width: 100%;
+    height: auto;
+    display: block;
     border-radius: 12px;
     border: 1px solid var(--border);
     background: var(--accent-soft);
   }
 
+  .photo-preview {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
   .photo-preview img {
-    max-width: 88px;
+    width: 72px;
+    height: 72px;
+    flex: 0 0 auto;
+    object-fit: cover;
+  }
+
+  .photo-block {
+    margin-top: 12px;
+  }
+
+  .photo-block img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+
+  .photo-limit-msg {
+    margin: 0;
+    padding: 16px;
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    background: var(--accent-soft);
+    border-radius: 12px;
+  }
+
+  .photo-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+
+  .reaction-btn,
+  .download-btn {
+    padding: 6px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--paper);
+    color: var(--ink-soft);
+    font-size: 0.82rem;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .reaction-btn.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  .entry-account {
+    margin: 0 0 10px;
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+  }
+
+  .filter-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 14px 4px;
+    flex-wrap: wrap;
+  }
+
+  .filter-row label {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+  }
+
+  .filter-row select {
+    padding: 6px 10px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--paper);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 0.85rem;
   }
 
   .result-card {
@@ -440,6 +524,12 @@
 
         <section class="diary-log" aria-labelledby="diary-log-title">
           <h2 id="diary-log-title">회원들이 함께 남긴 기록</h2>
+          <div class="filter-row">
+            <label for="account-filter">계정으로 필터</label>
+            <select id="account-filter">
+              <option value="">전체 회원</option>
+            </select>
+          </div>
           <p class="form-hint" id="list-hint" role="status" aria-live="polite"></p>
           <ul class="diary-list" id="diary-list"></ul>
           <p class="empty-state" id="empty-state">아직 기록된 하루가 없어요. 오늘의 한 줄을 남겨보세요.</p>
@@ -943,6 +1033,9 @@
       resultCard.classList.remove('visible', 'crisis');
 
       var MAX_PHOTOS = 5;
+      var DAILY_PHOTO_LIMIT = 5;
+      var QHD_WIDTH = 2560;
+      var QHD_HEIGHT = 1440;
       var previewObjectUrls = [];
 
       function clearPhotoPreview() {
@@ -969,31 +1062,194 @@
         });
       });
 
-      function uploadPhotos(files, userId) {
+      function resizeIfNeeded(file) {
+        return new Promise(function (resolve) {
+          var objectUrl = URL.createObjectURL(file);
+          var img = new Image();
+          img.onload = function () {
+            var w = img.naturalWidth, h = img.naturalHeight;
+            if (w <= QHD_WIDTH && h <= QHD_HEIGHT) {
+              URL.revokeObjectURL(objectUrl);
+              resolve(file);
+              return;
+            }
+            var scale = Math.min(QHD_WIDTH / w, QHD_HEIGHT / h);
+            var canvas = document.createElement('canvas');
+            canvas.width = Math.round(w * scale);
+            canvas.height = Math.round(h * scale);
+            var ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            URL.revokeObjectURL(objectUrl);
+            canvas.toBlob(function (blob) {
+              if (!blob) { resolve(file); return; }
+              var baseName = (file.name || 'photo').replace(/\.[^.]+$/, '');
+              resolve(new File([blob], baseName + '.jpg', { type: 'image/jpeg' }));
+            }, 'image/jpeg', 0.85);
+          };
+          img.onerror = function () { URL.revokeObjectURL(objectUrl); resolve(file); };
+          img.src = objectUrl;
+        });
+      }
+
+      function getTodayUploadCount(userId) {
+        var startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        return sb.from('diary_photos')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .gte('created_at', startOfDay.toISOString())
+          .then(function (res) {
+            if (res.error) throw res.error;
+            return res.count || 0;
+          });
+      }
+
+      function uploadPhotosForEntry(files, entryId, userId) {
         var uploads = files.map(function (file, idx) {
-          var extMatch = /\.([a-zA-Z0-9]+)$/.exec(file.name || '');
-          var ext = (extMatch ? extMatch[1] : 'jpg').toLowerCase();
-          var path = userId + '/' + Date.now() + '-' + idx + '-' + Math.random().toString(36).slice(2) + '.' + ext;
+          var path = userId + '/' + entryId + '/' + idx + '-' + Math.random().toString(36).slice(2) + '.jpg';
           return sb.storage.from('diary-photos').upload(path, file).then(function (res) {
             if (res.error) throw res.error;
-            return sb.storage.from('diary-photos').getPublicUrl(path).data.publicUrl;
+            var publicUrl = sb.storage.from('diary-photos').getPublicUrl(path).data.publicUrl;
+            return sb.from('diary_photos')
+              .insert([{ entry_id: entryId, user_id: userId, url: publicUrl }])
+              .select()
+              .then(function (r) {
+                if (r.error) throw r.error;
+                return r.data[0];
+              });
           });
         });
         return Promise.all(uploads);
       }
 
-      function buildPhotoRow(photoUrls) {
-        var row = document.createElement('div');
-        row.className = 'photo-row';
-        if (!photoUrls || !photoUrls.length) return row;
-        photoUrls.forEach(function (url) {
+      var reactionsByPhoto = {};
+      var viewsByPhoto = {};
+      var viewDecision = {};
+      var downloadsByPhoto = {};
+
+      function decideView(photo) {
+        if (viewDecision[photo.id]) return viewDecision[photo.id];
+        var current = viewsByPhoto[photo.id] || 0;
+        if (current < 2) {
+          viewDecision[photo.id] = 'show';
+          viewsByPhoto[photo.id] = current + 1;
+          sb.from('photo_views')
+            .upsert({ photo_id: photo.id, user_id: currentUser.id, view_count: current + 1 }, { onConflict: 'photo_id,user_id' })
+            .then(function (res) { if (res.error) console.error(res.error); });
+        } else {
+          viewDecision[photo.id] = 'blocked';
+        }
+        return viewDecision[photo.id];
+      }
+
+      function toggleReaction(photoId, type) {
+        var current = reactionsByPhoto[photoId] || { like: 0, dislike: 0, mine: null };
+        var newReaction = current.mine === type ? null : type;
+        var op = newReaction
+          ? sb.from('photo_reactions').upsert({ photo_id: photoId, user_id: currentUser.id, reaction: newReaction }, { onConflict: 'photo_id,user_id' })
+          : sb.from('photo_reactions').delete().eq('photo_id', photoId).eq('user_id', currentUser.id);
+
+        op.then(function (res) {
+          if (res.error) {
+            alert('처리 중 오류가 발생했어요: ' + res.error.message);
+            return;
+          }
+          if (current.mine) current[current.mine] = Math.max(0, current[current.mine] - 1);
+          if (newReaction) current[newReaction] = (current[newReaction] || 0) + 1;
+          current.mine = newReaction;
+          reactionsByPhoto[photoId] = current;
+          renderList();
+        });
+      }
+
+      function handleDownload(photoId, url) {
+        if (downloadsByPhoto[photoId]) {
+          alert('이미 다운로드 하였습니다, 2번째 다운로드는 용량관계로 제한됩니다');
+          return;
+        }
+        sb.from('photo_downloads')
+          .insert([{ photo_id: photoId, user_id: currentUser.id }])
+          .then(function (res) {
+            if (res.error) {
+              downloadsByPhoto[photoId] = true;
+              alert('이미 다운로드 하였습니다, 2번째 다운로드는 용량관계로 제한됩니다');
+              return;
+            }
+            downloadsByPhoto[photoId] = true;
+            return fetch(url)
+              .then(function (r) { return r.blob(); })
+              .then(function (blob) {
+                var blobUrl = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = 'diary-photo-' + photoId + '.jpg';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(blobUrl);
+              })
+              .catch(function (err) {
+                alert('다운로드 중 오류가 발생했어요: ' + err.message);
+              });
+          });
+      }
+
+      function buildPhotoBlock(photo) {
+        var wrap = document.createElement('div');
+        wrap.className = 'photo-block';
+
+        if (!photo.id) {
+          var legacyImg = document.createElement('img');
+          legacyImg.src = photo.url;
+          legacyImg.alt = '첨부된 사진';
+          legacyImg.loading = 'lazy';
+          wrap.appendChild(legacyImg);
+          return wrap;
+        }
+
+        var decision = decideView(photo);
+        if (decision === 'blocked') {
+          var msg = document.createElement('p');
+          msg.className = 'photo-limit-msg';
+          msg.textContent = '3번째 조회는 용량관계로 제한됩니다';
+          wrap.appendChild(msg);
+        } else {
           var img = document.createElement('img');
-          img.src = url;
+          img.src = photo.url;
           img.alt = '첨부된 사진';
           img.loading = 'lazy';
-          row.appendChild(img);
-        });
-        return row;
+          wrap.appendChild(img);
+        }
+
+        var actions = document.createElement('div');
+        actions.className = 'photo-actions';
+
+        var reaction = reactionsByPhoto[photo.id] || { like: 0, dislike: 0, mine: null };
+
+        var likeBtn = document.createElement('button');
+        likeBtn.type = 'button';
+        likeBtn.className = 'reaction-btn' + (reaction.mine === 'like' ? ' active' : '');
+        likeBtn.textContent = '👍 ' + reaction.like;
+        likeBtn.addEventListener('click', function () { toggleReaction(photo.id, 'like'); });
+
+        var dislikeBtn = document.createElement('button');
+        dislikeBtn.type = 'button';
+        dislikeBtn.className = 'reaction-btn' + (reaction.mine === 'dislike' ? ' active' : '');
+        dislikeBtn.textContent = '👎 ' + reaction.dislike;
+        dislikeBtn.addEventListener('click', function () { toggleReaction(photo.id, 'dislike'); });
+
+        var downloadBtn = document.createElement('button');
+        downloadBtn.type = 'button';
+        downloadBtn.className = 'download-btn';
+        downloadBtn.textContent = '다운로드';
+        downloadBtn.addEventListener('click', function () { handleDownload(photo.id, photo.url); });
+
+        actions.appendChild(likeBtn);
+        actions.appendChild(dislikeBtn);
+        actions.appendChild(downloadBtn);
+        wrap.appendChild(actions);
+
+        return wrap;
       }
 
       var EMOTION_STYLE_KEY = {
@@ -1011,6 +1267,51 @@
 
       var entries = [];
       var realtimeChannel = null;
+      var accountFilterSelect = document.getElementById('account-filter');
+
+      function loadReactionsAndUserState(photoIds) {
+        reactionsByPhoto = {};
+        viewsByPhoto = {};
+        viewDecision = {};
+        downloadsByPhoto = {};
+        if (!photoIds.length) return Promise.resolve();
+        return Promise.all([
+          sb.from('photo_reactions').select('*').in('photo_id', photoIds),
+          sb.from('photo_views').select('*').in('photo_id', photoIds),
+          sb.from('photo_downloads').select('*').in('photo_id', photoIds)
+        ]).then(function (results) {
+          (results[0].data || []).forEach(function (r) {
+            var bucket = reactionsByPhoto[r.photo_id] || (reactionsByPhoto[r.photo_id] = { like: 0, dislike: 0, mine: null });
+            bucket[r.reaction] += 1;
+            if (r.user_id === currentUser.id) bucket.mine = r.reaction;
+          });
+          (results[1].data || []).forEach(function (v) { viewsByPhoto[v.photo_id] = v.view_count; });
+          (results[2].data || []).forEach(function (d) { downloadsByPhoto[d.photo_id] = true; });
+        });
+      }
+
+      function renderAccountFilterOptions() {
+        var current = accountFilterSelect.value;
+        var emails = [];
+        entries.forEach(function (e) {
+          if (e.user_email && emails.indexOf(e.user_email) === -1) emails.push(e.user_email);
+        });
+        emails.sort();
+        accountFilterSelect.innerHTML = '';
+        var allOpt = document.createElement('option');
+        allOpt.value = '';
+        allOpt.textContent = '전체 회원';
+        accountFilterSelect.appendChild(allOpt);
+        emails.forEach(function (email) {
+          var opt = document.createElement('option');
+          opt.value = email;
+          opt.textContent = email;
+          accountFilterSelect.appendChild(opt);
+        });
+        if (emails.indexOf(current) !== -1) accountFilterSelect.value = current;
+      }
+
+      accountFilterSelect.addEventListener('change', renderList);
 
       function loadEntries() {
         listHint.textContent = '기록을 불러오는 중이에요...';
@@ -1019,16 +1320,37 @@
           .order('created_at', { ascending: false })
           .limit(200)
           .then(function (res) {
-            if (res.error) {
-              listHint.textContent = '기록을 불러오지 못했어요: ' + res.error.message;
+            if (res.error) throw res.error;
+            entries = res.data || [];
+            var entryIds = entries.map(function (e) { return e.id; });
+            if (!entryIds.length) {
               return;
             }
+            return sb.from('diary_photos')
+              .select('*')
+              .in('entry_id', entryIds)
+              .order('created_at', { ascending: true })
+              .then(function (pres) {
+                if (pres.error) throw pres.error;
+                var photosByEntry = {};
+                (pres.data || []).forEach(function (p) {
+                  (photosByEntry[p.entry_id] = photosByEntry[p.entry_id] || []).push(p);
+                });
+                var allPhotoIds = [];
+                entries.forEach(function (e) {
+                  e.photos = photosByEntry[e.id] || (e.photo_urls || []).map(function (u) { return { id: null, url: u }; });
+                  e.photos.forEach(function (p) { if (p.id) allPhotoIds.push(p.id); });
+                });
+                return loadReactionsAndUserState(allPhotoIds);
+              });
+          })
+          .then(function () {
             listHint.textContent = '';
-            entries = res.data || [];
+            renderAccountFilterOptions();
             renderList();
           })
           .catch(function (err) {
-            listHint.textContent = '기록을 불러오는 중 오류가 발생했어요: ' + err.message;
+            listHint.textContent = '기록을 불러오지 못했어요: ' + err.message;
           });
       }
 
@@ -1042,7 +1364,18 @@
             var incoming = payload.new;
             var alreadyExists = entries.some(function (e) { return e.id === incoming.id; });
             if (alreadyExists) return;
+            incoming.photos = [];
             entries.unshift(incoming);
+            renderAccountFilterOptions();
+            renderList();
+          })
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'diary_photos' }, function (payload) {
+            var photo = payload.new;
+            var owner = entries.find(function (e) { return e.id === photo.entry_id; });
+            if (!owner) return;
+            owner.photos = owner.photos || [];
+            if (owner.photos.some(function (p) { return p.id === photo.id; })) return;
+            owner.photos.push(photo);
             renderList();
           })
           .subscribe();
@@ -1082,13 +1415,18 @@
       function renderList() {
         diaryList.innerHTML = '';
 
-        if (entries.length === 0) {
+        var filterValue = accountFilterSelect.value;
+        var filtered = filterValue
+          ? entries.filter(function (e) { return e.user_email === filterValue; })
+          : entries;
+
+        if (filtered.length === 0) {
           emptyState.style.display = 'block';
           return;
         }
         emptyState.style.display = 'none';
 
-        entries.forEach(function (entry) {
+        filtered.forEach(function (entry) {
           var li = document.createElement('li');
           li.className = 'diary-item';
 
@@ -1101,6 +1439,10 @@
           meta.appendChild(time);
           meta.appendChild(buildBadge(entry.emotion, entry.emoji));
 
+          var account = document.createElement('p');
+          account.className = 'entry-account';
+          account.textContent = entry.user_email || '알 수 없는 계정';
+
           var text = document.createElement('p');
           text.className = 'diary-text';
           text.textContent = entry.text;
@@ -1110,7 +1452,10 @@
           response.textContent = entry.message;
 
           li.appendChild(meta);
-          li.appendChild(buildPhotoRow(entry.photo_urls));
+          li.appendChild(account);
+          (entry.photos || []).forEach(function (photo) {
+            li.appendChild(buildPhotoBlock(photo));
+          });
           li.appendChild(text);
           li.appendChild(response);
           diaryList.appendChild(li);
@@ -1124,9 +1469,9 @@
         resultEmotionName.textContent = entry.emotion;
         resultMessage.textContent = entry.message;
         resultPhotos.innerHTML = '';
-        (entry.photo_urls || []).forEach(function (url) {
+        (entry.photos || []).forEach(function (photo) {
           var img = document.createElement('img');
-          img.src = url;
+          img.src = photo.url;
           img.alt = '첨부된 사진';
           resultPhotos.appendChild(img);
         });
@@ -1158,32 +1503,52 @@
         submitBtn.disabled = true;
 
         var photoFiles = Array.prototype.slice.call(photoInput.files).slice(0, MAX_PHOTOS);
-        if (photoFiles.length) {
-          hint.textContent = '사진을 업로드하는 중이에요...';
-        }
 
-        (photoFiles.length ? uploadPhotos(photoFiles, currentUser.id) : Promise.resolve([]))
-          .then(function (photoUrls) {
+        getTodayUploadCount(currentUser.id)
+          .then(function (todayCount) {
+            var remaining = Math.max(0, DAILY_PHOTO_LIMIT - todayCount);
+            if (photoFiles.length > remaining) {
+              if (remaining === 0) {
+                hint.textContent = '오늘 사진 업로드 한도(' + DAILY_PHOTO_LIMIT + '장)를 모두 사용했어요. 내일 다시 시도해 주세요.';
+              } else {
+                hint.textContent = '오늘 남은 업로드 가능 장수는 ' + remaining + '장이에요. 앞의 ' + remaining + '장만 업로드돼요.';
+              }
+              photoFiles = photoFiles.slice(0, remaining);
+            }
+            if (photoFiles.length) {
+              hint.textContent = (hint.textContent ? hint.textContent + ' ' : '') + '사진을 준비하는 중이에요...';
+            }
+            return Promise.all(photoFiles.map(resizeIfNeeded));
+          })
+          .then(function (resizedFiles) {
             return sb.from(TABLE)
               .insert([{
                 user_id: currentUser.id,
+                user_email: currentUser.email,
                 text: text,
                 emotion: emotionResult.emotion,
                 intensity: emotionResult.intensity,
                 emoji: emotionResult.emoji,
-                message: message,
-                photo_urls: photoUrls.length ? photoUrls : null
+                message: message
               }])
-              .select();
+              .select()
+              .then(function (res) {
+                if (res.error) throw res.error;
+                var entry = res.data[0];
+                if (!resizedFiles.length) {
+                  entry.photos = [];
+                  return entry;
+                }
+                return uploadPhotosForEntry(resizedFiles, entry.id, currentUser.id).then(function (photos) {
+                  entry.photos = photos;
+                  return entry;
+                });
+              });
           })
-          .then(function (res) {
+          .then(function (entry) {
             submitBtn.disabled = false;
-            if (res.error) {
-              hint.textContent = '기록에 실패했어요: ' + res.error.message;
-              return;
-            }
-            var entry = res.data[0];
             entries.unshift(entry);
+            renderAccountFilterOptions();
             renderList();
             showResult(entry);
             hint.textContent = '';
@@ -1194,7 +1559,7 @@
           })
           .catch(function (err) {
             submitBtn.disabled = false;
-            hint.textContent = '사진 업로드 또는 기록 중 오류가 발생했어요: ' + err.message;
+            hint.textContent = '기록 중 오류가 발생했어요: ' + err.message;
           });
       });
 
