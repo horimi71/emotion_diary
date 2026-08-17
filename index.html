@@ -991,10 +991,13 @@
         sb.auth.signOut();
       });
 
+      var loadedForUserId = null;
+
       function showLoggedOut() {
         authCard.style.display = 'block';
         appContent.classList.remove('visible');
         authPassword.value = '';
+        loadedForUserId = null;
       }
 
       function showLoggedIn(user) {
@@ -1003,6 +1006,8 @@
         appContent.classList.add('visible');
         authPassword.value = '';
         userEmailLabel.textContent = user.email;
+        if (loadedForUserId === user.id) return;
+        loadedForUserId = user.id;
         loadEntries();
         subscribeRealtime();
       }
