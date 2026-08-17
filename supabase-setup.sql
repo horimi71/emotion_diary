@@ -49,6 +49,10 @@ create table if not exists diary_photos (
   created_at timestamptz not null default now()
 );
 
+-- 목록 화면용 저용량 썸네일(최대 320px, jpg quality 0.6). 원본(url)은 QHD 리사이즈본이며
+-- 사진을 눌렀을 때만 로드된다. 기존 행은 thumb_url = url로 백필해 두었다(용량 절감은 안 됨).
+alter table diary_photos add column if not exists thumb_url text;
+
 alter table diary_photos enable row level security;
 
 create policy "select_all_photos_for_members"
