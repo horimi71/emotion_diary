@@ -914,6 +914,7 @@
 
   global.analyzeEmotion = analyzeEmotion;
   global.generateEmpathyResponse = generateEmpathyResponse;
+  global.EMOTION_EMOJI = EMOJI;
 })(window);
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1484,6 +1485,19 @@
         resultCard.classList.toggle('crisis', styleKey === 'crisis');
       }
 
+      function fetchAiAnalysis(text) {
+        return fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text })
+        }).then(function (res) {
+          return res.json().then(function (data) {
+            if (!res.ok || data.error) throw new Error(data.error || ('AI 분석 요청 실패 (' + res.status + ')'));
+            return data;
+          });
+        });
+      }
+
       form.addEventListener('submit', function (e) {
         e.preventDefault();
         var text = input.value.trim();
@@ -1499,17 +1513,50 @@
           return;
         }
 
-        hint.textContent = '';
-
-        var emotionResult = analyzeEmotion(text);
-        var message = generateEmpathyResponse(emotionResult, text);
-
         var submitBtn = document.getElementById('submit-entry-btn');
         submitBtn.disabled = true;
 
-        var photoFiles = Array.prototype.slice.call(photoInput.files).slice(0, MAX_PHOTOS);
+        var localResult = analyzeEmotion(text);
+        var analysisPromise;
 
-        getTodayUploadCount(currentUser.id)
+        if (localResult.isCrisis) {
+          analysisPromise = Promise.resolve({
+            emotion: localResult.emotion,
+            intensity: localResult.intensity,
+            emoji: localResult.emoji,
+            message: generateEmpathyResponse(localResult, text)
+          });
+        } else {
+          hint.textContent = 'AI가 마음을 분석하는 중이에요...';
+          analysisPromise = fetchAiAnalysis(text)
+            .then(function (ai) {
+              return {
+                emotion: ai.emotion,
+                intensity: ai.intensity,
+                emoji: EMOTION_EMOJI[ai.emotion] || localResult.emoji,
+                message: ai.message
+              };
+            })
+            .catch(function (err) {
+              console.error('AI 분석 실패, 로컬 엔진으로 대체합니다:', err);
+              return {
+                emotion: localResult.emotion,
+                intensity: localResult.intensity,
+                emoji: localResult.emoji,
+                message: generateEmpathyResponse(localResult, text)
+              };
+            });
+        }
+
+        var photoFiles = Array.prototype.slice.call(photoInput.files).slice(0, MAX_PHOTOS);
+        var finalResult;
+
+        analysisPromise
+          .then(function (result) {
+            finalResult = result;
+            hint.textContent = '';
+            return getTodayUploadCount(currentUser.id);
+          })
           .then(function (todayCount) {
             var remaining = Math.max(0, DAILY_PHOTO_LIMIT - todayCount);
             if (photoFiles.length > remaining) {
@@ -1531,10 +1578,10 @@
                 user_id: currentUser.id,
                 user_email: currentUser.email,
                 text: text,
-                emotion: emotionResult.emotion,
-                intensity: emotionResult.intensity,
-                emoji: emotionResult.emoji,
-                message: message
+                emotion: finalResult.emotion,
+                intensity: finalResult.intensity,
+                emoji: finalResult.emoji,
+                message: finalResult.message
               }])
               .select()
               .then(function (res) {
@@ -1564,6 +1611,12 @@
           })
           .catch(function (err) {
             submitBtn.disabled = false;
+            var isStaleSession = err && (err.code === '23503' || /foreign key constraint/i.test(err.message || ''));
+            if (isStaleSession) {
+              hint.textContent = '로그인 세션에 문제가 있어서 자동으로 로그아웃했어요. 다시 로그인해 주세요.';
+              sb.auth.signOut();
+              return;
+            }
             hint.textContent = '기록 중 오류가 발생했어요: ' + err.message;
           });
       });
