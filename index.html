@@ -258,22 +258,6 @@
     font-size: 0.85rem;
   }
 
-  .result-card {
-    margin-bottom: 28px;
-    display: none;
-  }
-
-  .result-card.visible {
-    display: block;
-  }
-
-  .result-card h2 {
-    margin: 0 0 14px;
-    font-size: 1rem;
-    color: var(--ink-soft);
-    font-weight: 600;
-  }
-
   .emotion-badge {
     display: inline-flex;
     align-items: center;
@@ -289,12 +273,6 @@
     font-size: 1.2rem;
   }
 
-  .empathy-message {
-    margin: 0;
-    font-size: 1.05rem;
-    line-height: 1.7;
-  }
-
   [data-emotion="joy"]      { background: #fdead0; color: #8a5a00; }
   [data-emotion="sad"]      { background: #dde8f5; color: #2d5a8c; }
   [data-emotion="angry"]    { background: #f9dcd9; color: #9c3b3b; }
@@ -305,10 +283,6 @@
   [data-emotion="lonely"]   { background: #e2e4ef; color: #3f4a7a; }
   [data-emotion="neutral"]  { background: #ece6db; color: #5c5347; }
   [data-emotion="crisis"]   { background: #f6d9d9; color: #a13d3d; }
-
-  .result-card.crisis {
-    border-color: #e3b7b7;
-  }
 
   section.diary-log h2 {
     font-size: 1.05rem;
@@ -510,16 +484,6 @@
             <div class="photo-row photo-preview" id="photo-preview"></div>
             <p class="form-hint" id="form-hint" role="status" aria-live="polite"></p>
           </form>
-        </section>
-
-        <section class="card result-card" id="result-card" aria-live="polite" aria-atomic="true">
-          <h2>방금 남긴 마음</h2>
-          <div class="photo-row" id="result-photos"></div>
-          <span class="emotion-badge" id="result-badge">
-            <span class="emoji" id="result-emoji"></span>
-            <span id="result-emotion-name"></span>
-          </span>
-          <p class="empathy-message" id="result-message"></p>
         </section>
 
         <section class="diary-log" aria-labelledby="diary-log-title">
@@ -1025,18 +989,10 @@
       var form = document.getElementById('diary-form');
       var input = document.getElementById('diary-input');
       var hint = document.getElementById('form-hint');
-      var resultCard = document.getElementById('result-card');
-      var resultBadge = document.getElementById('result-badge');
-      var resultEmoji = document.getElementById('result-emoji');
-      var resultEmotionName = document.getElementById('result-emotion-name');
-      var resultMessage = document.getElementById('result-message');
-      var resultPhotos = document.getElementById('result-photos');
       var diaryList = document.getElementById('diary-list');
       var emptyState = document.getElementById('empty-state');
       var photoInput = document.getElementById('diary-photos');
       var photoPreview = document.getElementById('photo-preview');
-
-      resultCard.classList.remove('visible', 'crisis');
 
       var MAX_PHOTOS = 5;
       var DAILY_PHOTO_LIMIT = 5;
@@ -1468,23 +1424,6 @@
         });
       }
 
-      function showResult(entry) {
-        var styleKey = EMOTION_STYLE_KEY[entry.emotion] || 'neutral';
-        resultBadge.setAttribute('data-emotion', styleKey);
-        resultEmoji.textContent = entry.emoji;
-        resultEmotionName.textContent = entry.emotion;
-        resultMessage.textContent = entry.message;
-        resultPhotos.innerHTML = '';
-        (entry.photos || []).forEach(function (photo) {
-          var img = document.createElement('img');
-          img.src = photo.url;
-          img.alt = '첨부된 사진';
-          resultPhotos.appendChild(img);
-        });
-        resultCard.classList.add('visible');
-        resultCard.classList.toggle('crisis', styleKey === 'crisis');
-      }
-
       function fetchAiAnalysis(text) {
         return fetch('/api/analyze', {
           method: 'POST',
@@ -1602,7 +1541,6 @@
             entries.unshift(entry);
             renderAccountFilterOptions();
             renderList();
-            showResult(entry);
             hint.textContent = '';
             input.value = '';
             photoInput.value = '';
