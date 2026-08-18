@@ -470,52 +470,11 @@
     color: var(--ink);
   }
 
-  .notice-wrap {
-    position: relative;
-    display: block;
-    margin-top: 8px;
-    margin-left: auto;
-  }
-
-  .entry-form .notice-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    box-sizing: border-box;
-    padding: 0 8px;
-    border-radius: 8px;
-    border: 1px solid var(--accent);
-    background: transparent;
-    color: var(--accent);
-    font-size: 0.72rem;
-    font-family: inherit;
-    cursor: pointer;
-  }
-
-  .notice-tooltip {
-    display: none;
-    position: absolute;
-    top: 110%;
-    right: 0;
-    z-index: 5;
-    width: 240px;
-    max-width: 70vw;
-    padding: 12px 14px;
-    border-radius: 12px;
-    border: 1px solid var(--border);
-    background: var(--paper);
-    color: var(--ink);
-    font-size: 0.82rem;
+  .photo-notice {
+    margin: 6px 0 0;
+    font-size: 0.78rem;
+    color: var(--ink-soft);
     line-height: 1.5;
-    box-shadow: var(--shadow);
-  }
-
-  .notice-wrap:hover .notice-tooltip,
-  .notice-wrap:focus-within .notice-tooltip,
-  .notice-wrap.show .notice-tooltip {
-    display: block;
   }
 
   .admin-actions {
@@ -608,12 +567,9 @@
               >
             </div>
             <label for="diary-photos" class="photo-label">사진 첨부 (최대 5장, 선택)</label>
+            <p class="photo-notice">*주의사항 : 용량 관계로 1인당 하루 5장만 올릴 수 있으니 가장 기억나는 사진으로 선별하여 주세요~</p>
             <input type="file" id="diary-photos" name="diary-photos" accept="image/*" multiple>
             <div class="photo-row photo-preview" id="photo-preview"></div>
-            <div class="notice-wrap" id="notice-wrap">
-              <button type="button" class="notice-btn" id="notice-btn">*주의사항*</button>
-              <div class="notice-tooltip" role="tooltip">용량 관계로 가족 1인당 하루 5장만 올릴 수 있으니 가장 기억되는 사진을 선별하여 주세요~</div>
-            </div>
             <button type="submit" id="submit-entry-btn">기록하기</button>
             <p class="form-hint" id="form-hint" role="status" aria-live="polite"></p>
           </form>
@@ -1122,7 +1078,6 @@
         appContent.classList.add('visible');
         authPassword.value = '';
         userEmailLabel.textContent = phoneFromUser(user) + (isAdmin() ? ' (관리자)' : '');
-        syncNoticeButtonSize();
         if (loadedForUserId === user.id) return;
         loadedForUserId = user.id;
         loadEntries();
@@ -1146,25 +1101,6 @@
       var photoInput = document.getElementById('diary-photos');
       var photoPreview = document.getElementById('photo-preview');
 
-      var noticeWrap = document.getElementById('notice-wrap');
-      var noticeBtn = document.getElementById('notice-btn');
-      var submitEntryBtn = document.getElementById('submit-entry-btn');
-      noticeBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        noticeWrap.classList.toggle('show');
-      });
-      document.addEventListener('click', function (e) {
-        if (!noticeWrap.contains(e.target)) noticeWrap.classList.remove('show');
-      });
-
-      function syncNoticeButtonSize() {
-        var rect = submitEntryBtn.getBoundingClientRect();
-        if (!rect.width || !rect.height) return;
-        noticeWrap.style.width = rect.width + 'px';
-        noticeWrap.style.height = Math.round(rect.height / 2) + 'px';
-      }
-      syncNoticeButtonSize();
-      window.addEventListener('resize', syncNoticeButtonSize);
 
       var MAX_PHOTOS = 5;
       var DAILY_PHOTO_LIMIT = 5;
