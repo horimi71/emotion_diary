@@ -227,7 +227,7 @@
     display: flex;
     gap: 3px;
     justify-content: center;
-    margin-bottom: 8px;
+    margin-bottom: 21px;
   }
 
   .mini-reaction-btn {
@@ -265,6 +265,7 @@
     display: flex;
     gap: 8px;
     margin-top: 8px;
+    margin-bottom: 31px;
     flex-wrap: wrap;
   }
 
@@ -547,8 +548,16 @@
       flex-direction: column;
     }
 
+    .entry-form .input-row input[type="text"] {
+      flex-basis: auto;
+    }
+
     .entry-form button {
       width: 100%;
+    }
+
+    .entry-form input[type="text"]::placeholder {
+      font-size: 0.8rem;
     }
 
     header.app-header h1 {
@@ -561,7 +570,7 @@
   <div class="page">
     <header class="app-header">
       <h1>추억이 깃든 AI 공감 다이어리</h1>
-      <p>오늘 하루를 추억이 담긴 사진과 한 줄의 느낌을 올리면, 마음을 함께 들여다봐 드릴게요.</p>
+      <p>오늘 하루의 추억이 담긴 사진과 한 줄의 느낌을 올리면, 마음을 함께 들여다봐 드릴게요.</p>
     </header>
 
     <main>
@@ -1610,6 +1619,7 @@
         filtered.forEach(function (entry) {
           var li = document.createElement('li');
           li.className = 'diary-item';
+          li.setAttribute('data-entry-id', entry.id);
 
           var meta = document.createElement('div');
           meta.className = 'meta';
@@ -1680,17 +1690,34 @@
           });
       }
 
+      function preserveScrollAnchor(anchorEntryId, doRender) {
+        var el = anchorEntryId ? document.querySelector('[data-entry-id="' + anchorEntryId + '"]') : null;
+        var beforeTop = el ? el.getBoundingClientRect().top : null;
+        doRender();
+        if (beforeTop !== null) {
+          var newEl = document.querySelector('[data-entry-id="' + anchorEntryId + '"]');
+          if (newEl) {
+            window.scrollBy(0, newEl.getBoundingClientRect().top - beforeTop);
+          }
+        }
+      }
+
       function handleAdminDelete(entry) {
         if (!confirm('이 기록을 삭제할까요? 되돌릴 수 없어요.')) return;
+        var idx = entries.indexOf(entry);
+        var neighbor = entries[idx + 1] || entries[idx - 1];
+        var neighborId = neighbor ? neighbor.id : null;
         sb.from(TABLE).delete().eq('id', entry.id)
           .then(function (res) {
             if (res.error) {
               alert('삭제 중 오류가 발생했어요: ' + res.error.message);
               return;
             }
-            entries = entries.filter(function (e) { return e.id !== entry.id; });
-            renderAccountFilterOptions();
-            renderList();
+            preserveScrollAnchor(neighborId, function () {
+              entries = entries.filter(function (e) { return e.id !== entry.id; });
+              renderAccountFilterOptions();
+              renderList();
+            });
           });
       }
 
@@ -1702,11 +1729,13 @@
               alert('사진 삭제 중 오류가 발생했어요: ' + res.error.message);
               return;
             }
-            entry.photos = (entry.photos || []).filter(function (p) { return p.id !== photo.id; });
-            if (expandedPhotoByEntry[entry.id] === (photo.id || photo.url)) {
-              expandedPhotoByEntry[entry.id] = null;
-            }
-            renderList();
+            preserveScrollAnchor(entry.id, function () {
+              entry.photos = (entry.photos || []).filter(function (p) { return p.id !== photo.id; });
+              if (expandedPhotoByEntry[entry.id] === (photo.id || photo.url)) {
+                expandedPhotoByEntry[entry.id] = null;
+              }
+              renderList();
+            });
           });
       }
 
