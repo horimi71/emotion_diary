@@ -101,7 +101,8 @@
   }
 
   .entry-form button {
-    flex: 0 0 auto;
+    display: block;
+    width: 100%;
     padding: 14px 22px;
     border-radius: 14px;
     border: none;
@@ -112,6 +113,10 @@
     cursor: pointer;
     font-family: inherit;
     transition: background 0.15s ease, transform 0.1s ease;
+  }
+
+  #submit-entry-btn {
+    margin-top: 14px;
   }
 
   .entry-form button:hover {
@@ -544,18 +549,6 @@
       padding: 18px;
     }
 
-    .entry-form .input-row {
-      flex-direction: column;
-    }
-
-    .entry-form .input-row input[type="text"] {
-      flex-basis: auto;
-    }
-
-    .entry-form button {
-      width: 100%;
-    }
-
     .entry-form input[type="text"]::placeholder {
       font-size: 0.8rem;
     }
@@ -613,15 +606,15 @@
                 maxlength="500"
                 required
               >
-              <button type="submit" id="submit-entry-btn">기록하기</button>
-            </div>
-            <div class="notice-wrap" id="notice-wrap">
-              <button type="button" class="notice-btn" id="notice-btn">*주의사항*</button>
-              <div class="notice-tooltip" role="tooltip">용량 관계로 가족 1인당 하루 5장만 올릴 수 있으니 가장 기억되는 사진을 선별하여 주세요~</div>
             </div>
             <label for="diary-photos" class="photo-label">사진 첨부 (최대 5장, 선택)</label>
             <input type="file" id="diary-photos" name="diary-photos" accept="image/*" multiple>
             <div class="photo-row photo-preview" id="photo-preview"></div>
+            <div class="notice-wrap" id="notice-wrap">
+              <button type="button" class="notice-btn" id="notice-btn">*주의사항*</button>
+              <div class="notice-tooltip" role="tooltip">용량 관계로 가족 1인당 하루 5장만 올릴 수 있으니 가장 기억되는 사진을 선별하여 주세요~</div>
+            </div>
+            <button type="submit" id="submit-entry-btn">기록하기</button>
             <p class="form-hint" id="form-hint" role="status" aria-live="polite"></p>
           </form>
         </section>
