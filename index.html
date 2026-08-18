@@ -1746,7 +1746,7 @@
               if (remaining === 0) {
                 hint.textContent = '오늘 사진 업로드 한도(' + DAILY_PHOTO_LIMIT + '장)를 모두 사용했어요. 내일 다시 시도해 주세요.';
               } else {
-                hint.textContent = '오늘 남은 업로드 가능 장수는 ' + remaining + '장이에요. 앞의 ' + remaining + '장만 업로드돼요.';
+                hint.textContent = '하루 전체 ' + DAILY_PHOTO_LIMIT + '장 올릴 수 있으므로 선택된 사진 중 ' + remaining + '장만 올립니다.';
               }
               photoFiles = photoFiles.slice(0, remaining);
             }
