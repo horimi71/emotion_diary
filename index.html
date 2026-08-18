@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI 공감 다이어리</title>
+<title>추억을 적신 AI 공감 다이어리</title>
 <style>
   :root {
     --bg: #faf5ec;
@@ -185,13 +185,20 @@
   .photo-thumb-row {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: 6px;
+    gap: 6px 6px;
     margin-top: 10px;
+    align-items: start;
   }
 
   .photo-thumb-row:empty {
     display: none;
     margin-top: 0;
+  }
+
+  .photo-thumb-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
   }
 
   .photo-thumb-btn {
@@ -214,6 +221,30 @@
     height: 100%;
     object-fit: cover;
     display: block;
+  }
+
+  .mini-actions {
+    display: flex;
+    gap: 3px;
+    justify-content: center;
+  }
+
+  .mini-reaction-btn {
+    padding: 2px 5px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--paper);
+    color: var(--ink-soft);
+    font-size: 0.68rem;
+    font-family: inherit;
+    cursor: pointer;
+    line-height: 1.4;
+  }
+
+  .mini-reaction-btn.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
   }
 
   .photo-expand-wrap:empty {
@@ -432,6 +463,69 @@
     color: var(--ink);
   }
 
+  .notice-wrap {
+    position: relative;
+    display: inline-block;
+    margin-top: 12px;
+  }
+
+  .notice-btn {
+    padding: 7px 12px;
+    border-radius: 10px;
+    border: 1px dashed var(--accent);
+    background: var(--accent-soft);
+    color: #8a5a3a;
+    font-size: 0.8rem;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .notice-tooltip {
+    display: none;
+    position: absolute;
+    top: 110%;
+    left: 0;
+    z-index: 5;
+    width: 240px;
+    max-width: 70vw;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--paper);
+    color: var(--ink);
+    font-size: 0.82rem;
+    line-height: 1.5;
+    box-shadow: var(--shadow);
+  }
+
+  .notice-wrap:hover .notice-tooltip,
+  .notice-wrap:focus-within .notice-tooltip,
+  .notice-wrap.show .notice-tooltip {
+    display: block;
+  }
+
+  .admin-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .admin-btn {
+    padding: 6px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--paper);
+    color: var(--ink-soft);
+    font-size: 0.8rem;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .admin-btn.danger {
+    color: #a13d3d;
+    border-color: #e3b8b8;
+  }
+
   @media (max-width: 420px) {
     body {
       padding: 20px 10px 48px;
@@ -458,19 +552,19 @@
 <body>
   <div class="page">
     <header class="app-header">
-      <h1>AI 공감 다이어리</h1>
-      <p>오늘 하루를 한 줄로 적으면, 마음을 함께 들여다봐 드릴게요.</p>
+      <h1>추억을 적신 AI 공감 다이어리</h1>
+      <p>오늘 하루를 추억이 담긴 사진과 한 줄의 느낌을 적으면, 마음을 함께 들여다봐 드릴게요.</p>
     </header>
 
     <main>
       <section class="card auth-card" id="auth-card" aria-labelledby="auth-title">
         <h2 id="auth-title" class="section-title">회원 로그인</h2>
-        <p class="auth-desc">이메일 주소와 공통 비밀번호를 입력해 주세요. 처음 오신 분은 자동으로 회원가입돼요. 로그인한 회원들은 서로의 기록을 함께 볼 수 있어요.</p>
+        <p class="auth-desc">전화번호와 공통 비밀번호를 입력해 주세요. 처음 오신 분은 자동으로 회원가입돼요. 로그인한 회원들은 서로의 기록을 함께 볼 수 있어요.</p>
 
         <form id="email-form" novalidate>
-          <label for="auth-email">이메일 주소</label>
+          <label for="auth-phone">전화번호</label>
           <div class="input-row">
-            <input type="email" id="auth-email" name="auth-email" placeholder="you@example.com" autocomplete="email" required>
+            <input type="tel" id="auth-phone" name="auth-phone" placeholder="01012345678" autocomplete="tel" inputmode="numeric" required>
           </div>
           <label for="auth-password" style="margin-top:14px;">비밀번호</label>
           <div class="input-row">
@@ -504,6 +598,10 @@
               >
               <button type="submit" id="submit-entry-btn">기록하기</button>
             </div>
+            <div class="notice-wrap" id="notice-wrap">
+              <button type="button" class="notice-btn" id="notice-btn">*주의사항*</button>
+              <div class="notice-tooltip" role="tooltip">용량 관계로 가족 1인당 하루 5장만 올릴 수 있으니 가장 기억되는 사진을 선별하여 주세요~</div>
+            </div>
             <label for="diary-photos" class="photo-label">사진 첨부 (최대 5장, 선택)</label>
             <input type="file" id="diary-photos" name="diary-photos" accept="image/*" multiple>
             <div class="photo-row photo-preview" id="photo-preview"></div>
@@ -512,11 +610,11 @@
         </section>
 
         <section class="diary-log" aria-labelledby="diary-log-title">
-          <h2 id="diary-log-title">회원들이 함께 남긴 기록</h2>
+          <h2 id="diary-log-title">가족들의 추억이 담긴 기록</h2>
           <div class="filter-row">
             <label for="account-filter">계정으로 필터</label>
             <select id="account-filter">
-              <option value="">전체 회원</option>
+              <option value="">전체 가족</option>
             </select>
           </div>
           <p class="form-hint" id="list-hint" role="status" aria-live="polite"></p>
@@ -914,8 +1012,25 @@
       var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       var TABLE = 'diary_entries';
 
+      var PHONE_DOMAIN = '@phone.emotiondiary.local';
+      var ADMIN_PHONE_EMAIL = '01095306933' + PHONE_DOMAIN;
+
+      function phoneToAuthEmail(phoneDigits) {
+        return phoneDigits + PHONE_DOMAIN;
+      }
+
+      function phoneFromUser(user) {
+        if (!user || !user.email) return '';
+        var idx = user.email.indexOf(PHONE_DOMAIN);
+        return idx === -1 ? user.email : user.email.slice(0, idx);
+      }
+
+      function isAdmin() {
+        return !!currentUser && currentUser.email === ADMIN_PHONE_EMAIL;
+      }
+
       var emailForm = document.getElementById('email-form');
-      var authEmail = document.getElementById('auth-email');
+      var authPhone = document.getElementById('auth-phone');
       var authPassword = document.getElementById('auth-password');
       var authHint = document.getElementById('auth-hint');
       var authCard = document.getElementById('auth-card');
@@ -932,11 +1047,11 @@
 
       emailForm.addEventListener('submit', function (e) {
         e.preventDefault();
-        var email = authEmail.value.trim();
+        var phoneDigits = authPhone.value.replace(/[^0-9]/g, '');
         var password = authPassword.value;
 
-        if (!email) {
-          setAuthHint('이메일 주소를 입력해 주세요.');
+        if (!phoneDigits || phoneDigits.length < 9) {
+          setAuthHint('전화번호를 정확히 입력해 주세요.');
           return;
         }
         if (!password) {
@@ -944,6 +1059,7 @@
           return;
         }
 
+        var email = phoneToAuthEmail(phoneDigits);
         var btn = document.getElementById('send-code-btn');
         btn.disabled = true;
         setAuthHint('로그인하는 중이에요...');
@@ -995,7 +1111,7 @@
         authCard.style.display = 'none';
         appContent.classList.add('visible');
         authPassword.value = '';
-        userEmailLabel.textContent = user.email;
+        userEmailLabel.textContent = phoneFromUser(user) + (isAdmin() ? ' (관리자)' : '');
         if (loadedForUserId === user.id) return;
         loadedForUserId = user.id;
         loadEntries();
@@ -1019,10 +1135,20 @@
       var photoInput = document.getElementById('diary-photos');
       var photoPreview = document.getElementById('photo-preview');
 
+      var noticeWrap = document.getElementById('notice-wrap');
+      var noticeBtn = document.getElementById('notice-btn');
+      noticeBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        noticeWrap.classList.toggle('show');
+      });
+      document.addEventListener('click', function (e) {
+        if (!noticeWrap.contains(e.target)) noticeWrap.classList.remove('show');
+      });
+
       var MAX_PHOTOS = 5;
       var DAILY_PHOTO_LIMIT = 5;
-      var QHD_WIDTH = 2560;
-      var QHD_HEIGHT = 1440;
+      var FHD_WIDTH = 1920;
+      var FHD_HEIGHT = 1080;
       var THUMB_SIZE = 320;
       var previewObjectUrls = [];
 
@@ -1070,7 +1196,7 @@
           img.onload = function () {
             var baseName = (file.name || 'photo').replace(/\.[^.]+$/, '');
             Promise.all([
-              resizeToCanvas(img, QHD_WIDTH, QHD_HEIGHT, 0.85),
+              resizeToCanvas(img, FHD_WIDTH, FHD_HEIGHT, 0.85),
               resizeToCanvas(img, THUMB_SIZE, THUMB_SIZE, 0.6)
             ]).then(function (blobs) {
               URL.revokeObjectURL(objectUrl);
@@ -1166,6 +1292,31 @@
           });
       }
 
+      function buildReactionButtons(photoId, mini) {
+        var reaction = reactionsByPhoto[photoId] || { like: 0, dislike: 0, mine: null };
+        var btnClass = mini ? 'mini-reaction-btn' : 'reaction-btn';
+
+        var likeBtn = document.createElement('button');
+        likeBtn.type = 'button';
+        likeBtn.className = btnClass + (reaction.mine === 'like' ? ' active' : '');
+        likeBtn.textContent = '👍 ' + reaction.like;
+        likeBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          toggleReaction(photoId, 'like');
+        });
+
+        var dislikeBtn = document.createElement('button');
+        dislikeBtn.type = 'button';
+        dislikeBtn.className = btnClass + (reaction.mine === 'dislike' ? ' active' : '');
+        dislikeBtn.textContent = '👎 ' + reaction.dislike;
+        dislikeBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          toggleReaction(photoId, 'dislike');
+        });
+
+        return [likeBtn, dislikeBtn];
+      }
+
       function buildPhotoSection(entry) {
         var photos = entry.photos || [];
         if (!photos.length) return null;
@@ -1194,35 +1345,27 @@
             var actions = document.createElement('div');
             actions.className = 'photo-actions';
 
-            var reaction = reactionsByPhoto[photo.id] || { like: 0, dislike: 0, mine: null };
-
-            var likeBtn = document.createElement('button');
-            likeBtn.type = 'button';
-            likeBtn.className = 'reaction-btn' + (reaction.mine === 'like' ? ' active' : '');
-            likeBtn.textContent = '👍 ' + reaction.like;
-            likeBtn.addEventListener('click', function () { toggleReaction(photo.id, 'like'); });
-
-            var dislikeBtn = document.createElement('button');
-            dislikeBtn.type = 'button';
-            dislikeBtn.className = 'reaction-btn' + (reaction.mine === 'dislike' ? ' active' : '');
-            dislikeBtn.textContent = '👎 ' + reaction.dislike;
-            dislikeBtn.addEventListener('click', function () { toggleReaction(photo.id, 'dislike'); });
+            var buttons = buildReactionButtons(photo.id, false);
+            actions.appendChild(buttons[0]);
+            actions.appendChild(buttons[1]);
 
             var downloadBtn = document.createElement('button');
             downloadBtn.type = 'button';
             downloadBtn.className = 'download-btn';
             downloadBtn.textContent = '다운로드';
             downloadBtn.addEventListener('click', function () { handleDownload(photo.id, photo.url); });
-
-            actions.appendChild(likeBtn);
-            actions.appendChild(dislikeBtn);
             actions.appendChild(downloadBtn);
+
             expandWrap.appendChild(actions);
           }
         }
 
         photos.forEach(function (photo) {
           var photoKey = photo.id || photo.url;
+
+          var cell = document.createElement('div');
+          cell.className = 'photo-thumb-cell';
+
           var btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'photo-thumb-btn' + (expandedPhotoByEntry[entry.id] === photoKey ? ' active' : '');
@@ -1238,7 +1381,18 @@
             renderList();
           });
 
-          row.appendChild(btn);
+          cell.appendChild(btn);
+
+          if (photo.id) {
+            var miniActions = document.createElement('div');
+            miniActions.className = 'mini-actions';
+            var miniButtons = buildReactionButtons(photo.id, true);
+            miniActions.appendChild(miniButtons[0]);
+            miniActions.appendChild(miniButtons[1]);
+            cell.appendChild(miniActions);
+          }
+
+          row.appendChild(cell);
         });
 
         renderExpanded();
@@ -1280,23 +1434,23 @@
 
       function renderAccountFilterOptions() {
         var current = accountFilterSelect.value;
-        var emails = [];
+        var phones = [];
         entries.forEach(function (e) {
-          if (e.user_email && emails.indexOf(e.user_email) === -1) emails.push(e.user_email);
+          if (e.user_phone && phones.indexOf(e.user_phone) === -1) phones.push(e.user_phone);
         });
-        emails.sort();
+        phones.sort();
         accountFilterSelect.innerHTML = '';
         var allOpt = document.createElement('option');
         allOpt.value = '';
-        allOpt.textContent = '전체 회원';
+        allOpt.textContent = '전체 가족';
         accountFilterSelect.appendChild(allOpt);
-        emails.forEach(function (email) {
+        phones.forEach(function (phone) {
           var opt = document.createElement('option');
-          opt.value = email;
-          opt.textContent = email;
+          opt.value = phone;
+          opt.textContent = phone;
           accountFilterSelect.appendChild(opt);
         });
-        if (emails.indexOf(current) !== -1) accountFilterSelect.value = current;
+        if (phones.indexOf(current) !== -1) accountFilterSelect.value = current;
       }
 
       accountFilterSelect.addEventListener('change', renderList);
@@ -1405,7 +1559,7 @@
 
         var filterValue = accountFilterSelect.value;
         var filtered = filterValue
-          ? entries.filter(function (e) { return e.user_email === filterValue; })
+          ? entries.filter(function (e) { return e.user_phone === filterValue; })
           : entries;
 
         if (filtered.length === 0) {
@@ -1429,7 +1583,7 @@
 
           var account = document.createElement('p');
           account.className = 'entry-account';
-          account.textContent = entry.user_email || '알 수 없는 계정';
+          account.textContent = entry.user_phone || '알 수 없는 계정';
 
           var text = document.createElement('p');
           text.className = 'diary-text';
@@ -1445,8 +1599,60 @@
           if (photoSection) li.appendChild(photoSection);
           li.appendChild(text);
           li.appendChild(response);
+
+          if (isAdmin()) {
+            var adminActions = document.createElement('div');
+            adminActions.className = 'admin-actions';
+
+            var editBtn = document.createElement('button');
+            editBtn.type = 'button';
+            editBtn.className = 'admin-btn';
+            editBtn.textContent = '수정';
+            editBtn.addEventListener('click', function () { handleAdminEdit(entry); });
+
+            var deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.className = 'admin-btn danger';
+            deleteBtn.textContent = '삭제';
+            deleteBtn.addEventListener('click', function () { handleAdminDelete(entry); });
+
+            adminActions.appendChild(editBtn);
+            adminActions.appendChild(deleteBtn);
+            li.appendChild(adminActions);
+          }
+
           diaryList.appendChild(li);
         });
+      }
+
+      function handleAdminEdit(entry) {
+        var newText = prompt('내용을 수정하세요', entry.text);
+        if (newText === null) return;
+        newText = newText.trim();
+        if (!newText || newText === entry.text) return;
+        sb.from(TABLE).update({ text: newText }).eq('id', entry.id).select()
+          .then(function (res) {
+            if (res.error) {
+              alert('수정 중 오류가 발생했어요: ' + res.error.message);
+              return;
+            }
+            entry.text = newText;
+            renderList();
+          });
+      }
+
+      function handleAdminDelete(entry) {
+        if (!confirm('이 기록을 삭제할까요? 되돌릴 수 없어요.')) return;
+        sb.from(TABLE).delete().eq('id', entry.id)
+          .then(function (res) {
+            if (res.error) {
+              alert('삭제 중 오류가 발생했어요: ' + res.error.message);
+              return;
+            }
+            entries = entries.filter(function (e) { return e.id !== entry.id; });
+            renderAccountFilterOptions();
+            renderList();
+          });
       }
 
       function fetchAiAnalysis(text) {
@@ -1540,7 +1746,7 @@
             return sb.from(TABLE)
               .insert([{
                 user_id: currentUser.id,
-                user_email: currentUser.email,
+                user_phone: phoneFromUser(currentUser),
                 text: text,
                 emotion: finalResult.emotion,
                 intensity: finalResult.intensity,

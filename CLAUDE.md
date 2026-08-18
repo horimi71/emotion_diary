@@ -25,21 +25,30 @@ The app must be viewable by non-technical members with zero setup, so everything
 
 ## Auth model
 
-Passwordless was tried and abandoned. Current scheme: **shared fixed password for all members**.
+Passwordless was tried and abandoned. Current scheme: **phone number + shared fixed password for all members**.
 
-- Email + password `260821` (same password for everyone — this is a private/trusted-group app, not a security boundary).
+- The login field collects a **phone number** (digits only, e.g. `01012345678`), not an email — this app's members think in phone numbers, not emails. Supabase Auth is still email-based under the hood, so the client builds a synthetic address `<digits>@phone.emotiondiary.local` (`phoneToAuthEmail` in `index.html`) and signs in/up with that + the fixed password `260821` (same password for everyone — this is a private/trusted-group app, not a security boundary).
 - Client tries `signInWithPassword` first; on failure, falls back to `signUp` (auto-registers new members). See the `email-form` submit handler in `index.html`.
+- `phoneFromUser(user)` strips the `@phone.emotiondiary.local` suffix back off `user.email` to get the displayable/storable phone number — used for the user-bar label and the `user_phone` column on insert.
 - Supabase project setting **Confirm email must be OFF** (Authentication → Providers → Email) or new signups won't get a session back.
 - `sb.auth.onAuthStateChange` can fire more than once per real sign-in (`INITIAL_SESSION`, `SIGNED_IN`, etc.). `loadedForUserId` guards `loadEntries()`/`subscribeRealtime()` from double-running — **don't remove this guard**, it previously caused the per-photo view counter to burn through its budget twice as fast.
 - If a logged-in user's `auth.users` row gets deleted (e.g. manual cleanup) while their browser still holds a valid session, inserts fail with a Postgres FK violation (`23503`). The submit handler catches this, force-signs-out, and shows a friendly message instead of the raw Postgres error.
+- Accounts created before this change used real email addresses as the Supabase identity; those rows still display fine (their `user_phone` value is just an email string, cosmetically odd but harmless) but that person can no longer sign back into the *same* auth identity via the phone field — they'll end up as a new account if they log in again with a phone number.
+
+### Admin account
+
+- `01095306933` is the hardcoded admin phone number (`ADMIN_PHONE_EMAIL` in `index.html`, matched against `currentUser.email`). Logging in as this number shows "(관리자)" next to the phone in the user bar and adds 수정/삭제 (edit/delete) buttons to **every** diary entry, not just the admin's own.
+- Enforced at the DB layer too, not just hidden UI: `admin_update_entries` / `admin_delete_entries` / `admin_update_photos` / `admin_delete_photos` RLS policies on `diary_entries` and `diary_photos` check `auth.jwt() ->> 'email' = '01095306933@phone.emotiondiary.local'`. Without these, admin update/delete calls would silently no-op under RLS (there was previously no update/delete policy at all — only select-all and insert-own).
+- Edit uses a plain `prompt()`, delete uses `confirm()` — matches the app's existing minimal-UI conventions (alerts elsewhere for photo actions), not a design choice to revisit lightly.
 
 ## Database (see `supabase-setup.sql` — apply via Supabase SQL Editor or the Supabase MCP)
 
-- `diary_entries` — one row per diary entry (`text`, `emotion`, `intensity`, `emoji`, `message`, `user_id`, `user_email` denormalized for display/filtering, `created_at`). RLS: any authenticated member can `select` all rows; `insert` only your own.
-- `diary_photos` — photos belong to an entry (`entry_id` FK), uploaded to the `diary-photos` Storage bucket. Legacy entries from before this table existed may still carry a `photo_urls text[]` array column — `index.html` falls back to rendering those as plain images (`photo.id === null`) without the like/view/download features.
-- `photo_reactions`, `photo_views`, `photo_downloads` — per-(photo, user) rows enforcing: like/dislike toggle, **2 views per member per photo** (3rd+ shows a capacity notice instead of the image), **1 download per member per photo**.
-- Daily upload cap: **5 photos per account per day** total, checked client-side by counting today's `diary_photos` rows for that user before upload (not DB-enforced).
-- Photos over **QHD (2560×1440)** are downscaled + re-encoded as JPEG (canvas, quality 0.85) client-side before upload.
+- `diary_entries` — one row per diary entry (`text`, `emotion`, `intensity`, `emoji`, `message`, `user_id`, `user_phone` denormalized for display/filtering — holds the phone number since the auth-model change, previously named `user_email`, `created_at`). RLS: any authenticated member can `select` all rows; `insert` only your own; `update`/`delete` restricted to the admin account (see above).
+- `diary_photos` — photos belong to an entry (`entry_id` FK), uploaded to the `diary-photos` Storage bucket, with `url` (full-size) and `thumb_url` (small list-view thumbnail) both stored per photo. Legacy entries from before this table existed may still carry a `photo_urls text[]` array column — `index.html` falls back to rendering those as plain images (`photo.id === null`) without the like/download/thumbnail features.
+- `photo_reactions` — per-(photo, user) like/dislike toggle, shown both under each thumbnail (compact) and under the expanded full-size photo.
+- `photo_views`, `photo_downloads` tables still exist in the schema but are **no longer used** — the view-count limit and the one-download-per-photo limit were both removed; downloads are now unlimited and views aren't tracked (the thumbnail-first UI made per-view bandwidth limiting unnecessary).
+- Daily upload cap: **5 photos per account per day** total, checked client-side by counting today's `diary_photos` rows for that user before upload (not DB-enforced). A "*주의사항*" (notice) button below the entry form surfaces this as a tooltip (click-to-toggle, since hover doesn't work on mobile).
+- Two image variants are generated client-side before upload (canvas, JPEG): a **Full HD (1920×1080)** cap for the full-size image (quality 0.85) and a **320×320** thumbnail (quality 0.6) used in the list view's 5-per-row thumbnail grid. Tapping a thumbnail loads/shows the full-size image inline, fit to width. (Was QHD 2560×1440 before — lowered to Full HD.)
 
 ## Emotion analysis
 
@@ -67,7 +76,7 @@ Supabase schema changes: apply directly via the Supabase MCP (`apply_migration` 
 
 ## Testing
 
-No automated test suite. Verify changes by driving the live Vercel URL with the browser tool (or a local file:// open of `index.html` for logic that doesn't need the API route) — log in with a throwaway `*@example.com` address and password `260821`, exercise the flow, then delete the throwaway `auth.users` row and any rows it created via the Supabase MCP so test data doesn't pollute the real members' shared feed.
+No automated test suite. Verify changes by driving the live Vercel URL with the browser tool (or a local file:// open of `index.html` for logic that doesn't need the API route) — log in with a throwaway phone number (e.g. `0100000099`) and password `260821`, exercise the flow, then delete the throwaway `auth.users` row (`email = '<digits>@phone.emotiondiary.local'`) and any rows it created via the Supabase MCP so test data doesn't pollute the real members' shared feed. Never delete the `01095306933` admin account.
 
 ## History / abandoned approaches (don't redo these)
 

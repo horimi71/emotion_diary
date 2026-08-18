@@ -41,6 +41,20 @@ create policy "anyone_can_view_diary_photos"
 
 alter table diary_entries add column if not exists user_email text;
 
+-- 이메일 대신 전화번호로 로그인하는 방식으로 전환하며 컬럼명도 맞춤 (내용은 그대로 유지됨)
+alter table diary_entries rename column user_email to user_phone;
+
+-- 관리자(01095306933@phone.emotiondiary.local)는 모든 회원의 기록/사진을 수정·삭제할 수 있다.
+-- 그 외에는 update/delete 정책이 없으므로 일반 회원은 자신의 글도 수정/삭제할 수 없다.
+create policy "admin_update_entries"
+  on diary_entries for update
+  using (auth.jwt() ->> 'email' = '01095306933@phone.emotiondiary.local')
+  with check (auth.jwt() ->> 'email' = '01095306933@phone.emotiondiary.local');
+
+create policy "admin_delete_entries"
+  on diary_entries for delete
+  using (auth.jwt() ->> 'email' = '01095306933@phone.emotiondiary.local');
+
 create table if not exists diary_photos (
   id uuid primary key default gen_random_uuid(),
   entry_id uuid not null references diary_entries(id) on delete cascade,
@@ -49,7 +63,7 @@ create table if not exists diary_photos (
   created_at timestamptz not null default now()
 );
 
--- 목록 화면용 저용량 썸네일(최대 320px, jpg quality 0.6). 원본(url)은 QHD 리사이즈본이며
+-- 목록 화면용 저용량 썸네일(최대 320px, jpg quality 0.6). 원본(url)은 Full HD(1920x1080) 리사이즈본이며
 -- 사진을 눌렀을 때만 로드된다. 기존 행은 thumb_url = url로 백필해 두었다(용량 절감은 안 됨).
 alter table diary_photos add column if not exists thumb_url text;
 
@@ -67,6 +81,15 @@ create index if not exists diary_photos_entry_idx on diary_photos (entry_id);
 create index if not exists diary_photos_user_created_idx on diary_photos (user_id, created_at desc);
 
 alter publication supabase_realtime add table diary_photos;
+
+create policy "admin_update_photos"
+  on diary_photos for update
+  using (auth.jwt() ->> 'email' = '01095306933@phone.emotiondiary.local')
+  with check (auth.jwt() ->> 'email' = '01095306933@phone.emotiondiary.local');
+
+create policy "admin_delete_photos"
+  on diary_photos for delete
+  using (auth.jwt() ->> 'email' = '01095306933@phone.emotiondiary.local');
 
 create table if not exists photo_reactions (
   photo_id uuid not null references diary_photos(id) on delete cascade,
@@ -97,6 +120,8 @@ create policy "delete_own_reaction"
 
 alter publication supabase_realtime add table photo_reactions;
 
+-- photo_views, photo_downloads: no longer used by index.html (view-count limit and the
+-- one-download-per-photo limit were both removed). Left in place, harmless if unused.
 create table if not exists photo_views (
   photo_id uuid not null references diary_photos(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
