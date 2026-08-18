@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>추억을 적신 AI 공감 다이어리</title>
+<title>추억이 깃든 AI 공감 다이어리</title>
 <style>
   :root {
     --bg: #faf5ec;
@@ -227,6 +227,7 @@
     display: flex;
     gap: 3px;
     justify-content: center;
+    margin-bottom: 8px;
   }
 
   .mini-reaction-btn {
@@ -465,17 +466,24 @@
 
   .notice-wrap {
     position: relative;
-    display: inline-block;
-    margin-top: 12px;
+    display: block;
+    margin-top: 8px;
+    margin-left: auto;
   }
 
-  .notice-btn {
-    padding: 7px 12px;
-    border-radius: 10px;
-    border: 1px dashed var(--accent);
-    background: var(--accent-soft);
-    color: #8a5a3a;
-    font-size: 0.8rem;
+  .entry-form .notice-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    padding: 0 8px;
+    border-radius: 8px;
+    border: 1px solid var(--accent);
+    background: transparent;
+    color: var(--accent);
+    font-size: 0.72rem;
     font-family: inherit;
     cursor: pointer;
   }
@@ -484,7 +492,7 @@
     display: none;
     position: absolute;
     top: 110%;
-    left: 0;
+    right: 0;
     z-index: 5;
     width: 240px;
     max-width: 70vw;
@@ -552,13 +560,13 @@
 <body>
   <div class="page">
     <header class="app-header">
-      <h1>추억을 적신 AI 공감 다이어리</h1>
-      <p>오늘 하루를 추억이 담긴 사진과 한 줄의 느낌을 적으면, 마음을 함께 들여다봐 드릴게요.</p>
+      <h1>추억이 깃든 AI 공감 다이어리</h1>
+      <p>오늘 하루를 추억이 담긴 사진과 한 줄의 느낌을 올리면, 마음을 함께 들여다봐 드릴게요.</p>
     </header>
 
     <main>
       <section class="card auth-card" id="auth-card" aria-labelledby="auth-title">
-        <h2 id="auth-title" class="section-title">회원 로그인</h2>
+        <h2 id="auth-title" class="section-title">가족회원 로그인</h2>
         <p class="auth-desc">전화번호와 공통 비밀번호를 입력해 주세요. 처음 오신 분은 자동으로 회원가입돼요. 로그인한 회원들은 서로의 기록을 함께 볼 수 있어요.</p>
 
         <form id="email-form" novalidate>
@@ -1112,6 +1120,7 @@
         appContent.classList.add('visible');
         authPassword.value = '';
         userEmailLabel.textContent = phoneFromUser(user) + (isAdmin() ? ' (관리자)' : '');
+        syncNoticeButtonSize();
         if (loadedForUserId === user.id) return;
         loadedForUserId = user.id;
         loadEntries();
@@ -1137,6 +1146,7 @@
 
       var noticeWrap = document.getElementById('notice-wrap');
       var noticeBtn = document.getElementById('notice-btn');
+      var submitEntryBtn = document.getElementById('submit-entry-btn');
       noticeBtn.addEventListener('click', function (e) {
         e.stopPropagation();
         noticeWrap.classList.toggle('show');
@@ -1145,28 +1155,35 @@
         if (!noticeWrap.contains(e.target)) noticeWrap.classList.remove('show');
       });
 
+      function syncNoticeButtonSize() {
+        var rect = submitEntryBtn.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        noticeWrap.style.width = rect.width + 'px';
+        noticeWrap.style.height = Math.round(rect.height / 2) + 'px';
+      }
+      syncNoticeButtonSize();
+      window.addEventListener('resize', syncNoticeButtonSize);
+
       var MAX_PHOTOS = 5;
       var DAILY_PHOTO_LIMIT = 5;
       var FHD_WIDTH = 1920;
       var FHD_HEIGHT = 1080;
       var THUMB_SIZE = 320;
       var previewObjectUrls = [];
+      var selectedPhotoFiles = [];
 
       function clearPhotoPreview() {
         previewObjectUrls.forEach(function (u) { URL.revokeObjectURL(u); });
         previewObjectUrls = [];
         photoPreview.innerHTML = '';
+        selectedPhotoFiles = [];
       }
 
-      photoInput.addEventListener('change', function () {
-        clearPhotoPreview();
-        var files = Array.prototype.slice.call(photoInput.files);
-        if (files.length > MAX_PHOTOS) {
-          hint.textContent = '사진은 최대 ' + MAX_PHOTOS + '장까지 첨부할 수 있어요. 앞의 ' + MAX_PHOTOS + '장만 사용돼요.';
-        } else {
-          hint.textContent = '';
-        }
-        files.slice(0, MAX_PHOTOS).forEach(function (file) {
+      function renderPhotoPreview() {
+        previewObjectUrls.forEach(function (u) { URL.revokeObjectURL(u); });
+        previewObjectUrls = [];
+        photoPreview.innerHTML = '';
+        selectedPhotoFiles.forEach(function (file) {
           var url = URL.createObjectURL(file);
           previewObjectUrls.push(url);
           var img = document.createElement('img');
@@ -1174,6 +1191,19 @@
           img.alt = '첨부할 사진 미리보기';
           photoPreview.appendChild(img);
         });
+      }
+
+      photoInput.addEventListener('change', function () {
+        var newFiles = Array.prototype.slice.call(photoInput.files);
+        var combined = selectedPhotoFiles.concat(newFiles);
+        if (combined.length > MAX_PHOTOS) {
+          hint.textContent = '사진은 최대 ' + MAX_PHOTOS + '장까지 첨부할 수 있어요. 앞의 ' + MAX_PHOTOS + '장만 사용돼요.';
+        } else {
+          hint.textContent = '';
+        }
+        selectedPhotoFiles = combined.slice(0, MAX_PHOTOS);
+        photoInput.value = '';
+        renderPhotoPreview();
       });
 
       function resizeToCanvas(img, maxW, maxH, quality) {
@@ -1355,6 +1385,15 @@
             downloadBtn.textContent = '다운로드';
             downloadBtn.addEventListener('click', function () { handleDownload(photo.id, photo.url); });
             actions.appendChild(downloadBtn);
+
+            if (isAdmin()) {
+              var deletePhotoBtn = document.createElement('button');
+              deletePhotoBtn.type = 'button';
+              deletePhotoBtn.className = 'admin-btn danger';
+              deletePhotoBtn.textContent = '사진삭제';
+              deletePhotoBtn.addEventListener('click', function () { handleAdminDeletePhoto(entry, photo); });
+              actions.appendChild(deletePhotoBtn);
+            }
 
             expandWrap.appendChild(actions);
           }
@@ -1655,6 +1694,22 @@
           });
       }
 
+      function handleAdminDeletePhoto(entry, photo) {
+        if (!confirm('이 사진을 삭제할까요? 되돌릴 수 없어요.')) return;
+        sb.from('diary_photos').delete().eq('id', photo.id)
+          .then(function (res) {
+            if (res.error) {
+              alert('사진 삭제 중 오류가 발생했어요: ' + res.error.message);
+              return;
+            }
+            entry.photos = (entry.photos || []).filter(function (p) { return p.id !== photo.id; });
+            if (expandedPhotoByEntry[entry.id] === (photo.id || photo.url)) {
+              expandedPhotoByEntry[entry.id] = null;
+            }
+            renderList();
+          });
+      }
+
       function fetchAiAnalysis(text) {
         return fetch('/api/analyze', {
           method: 'POST',
@@ -1718,7 +1773,7 @@
             });
         }
 
-        var photoFiles = Array.prototype.slice.call(photoInput.files).slice(0, MAX_PHOTOS);
+        var photoFiles = selectedPhotoFiles.slice(0, MAX_PHOTOS);
         var finalResult;
 
         analysisPromise
